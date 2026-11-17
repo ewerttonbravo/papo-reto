@@ -10,11 +10,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let image = NSImage(systemSymbolName: AppState.loading.iconName, accessibilityDescription: "Papo Reto")
         image?.isTemplate = true
         item.button?.image = image
-        // An unknown symbol name yields nil: show text so the menu (and "Sair") stays reachable.
+        // An unknown symbol name yields nil: show text so the menu (and "Quit") stays reachable.
         if image == nil { item.button?.title = "PR" }
 
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Sair", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
     }

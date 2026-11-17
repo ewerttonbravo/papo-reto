@@ -15,9 +15,9 @@ else
 	@BIN=$$(swift build --show-bin-path); \
 	xcrun llvm-cov report "$$BIN/PapoRetoPackageTests.xctest/Contents/MacOS/PapoRetoPackageTests" \
 		-instr-profile "$$BIN/codecov/default.profdata" Sources/PapoRetoCore \
-	| awk '/^TOTAL/ { ok = 1; print "Cobertura de linha do PapoRetoCore: " $$10 " (" $$9 " linhas sem teste)"; \
-		if ($$9 != 0) { print "Gate: o Core precisa de 100% de linha."; exit 1 } } \
-		END { if (!ok) { print "Gate: relatório de cobertura não encontrado."; exit 1 } }'
+	| awk '/^TOTAL/ { ok = 1; print "PapoRetoCore line coverage: " $$10 " (" $$9 " untested lines)"; \
+		if ($$9 != 0) { print "Gate: the Core needs 100% line coverage."; exit 1 } } \
+		END { if (!ok) { print "Gate: coverage report not found."; exit 1 } }'
 endif
 
 .PHONY: app run

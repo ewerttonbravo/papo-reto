@@ -1,17 +1,17 @@
 # Papo Reto
 
-Ditado por voz para macOS, focado em PT-BR, 100% local. Segura `Fn`, fala, solta: o texto aparece no cursor.
+Voice dictation for macOS, focused on Brazilian Portuguese (PT-BR), 100% local. Hold `Fn`, speak, release: the text appears at the cursor.
 
-Em desenvolvimento: por enquanto o app só aparece na menu bar.
+In development: for now the app only shows up in the menu bar.
 
-## Compilar e rodar
-Requer macOS 13+ e as Command Line Tools (`xcode-select --install`) ou o Xcode.
+## Build and run
+Requires macOS 13+ and the Command Line Tools (`xcode-select --install`) or Xcode.
 
 ```sh
-make test   # testes + 100% de cobertura de linha no PapoRetoCore
-make app    # gera build/PapoReto.app para uso local
-make run    # gera e abre o app
+make test   # tests + 100% line coverage on PapoRetoCore
+make app    # builds build/PapoReto.app for local use
+make run    # builds and opens the app
 ```
 
-## Licença
-MIT. Veja [LICENSE](LICENSE).
+## License
+MIT. See [LICENSE](LICENSE).

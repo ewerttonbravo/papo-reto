@@ -68,8 +68,8 @@ O compilador impede o Core de importar o app. Todas as transições de estado pa
 - `make bench` (task que mexe em áudio ou modelo): texto, latência e RAM dos WAVs de referência contra o orçamento.
 - CI (GitHub Actions, macOS): `make test`.
 
-## Comandos (criados na T00)
-`make test` · `swift test --filter <Teste>` · `make bench` · `make app` (monta e assina o `.app`) · `make run` · `make install` · `make release`
+## Comandos
+`make test` · `make test FILTER=<Teste>` (um teste, sem cobertura; nas CLT o `swift test` puro não acha o Swift Testing) · `make app` (monta e assina o `.app`) · `make run`. A criar: `make bench` (T01), `make install` (T09), `make release` (T10).
 
 ## Convenções
 - Código e nomes em inglês; UI, README, commits e docs em PT-BR.

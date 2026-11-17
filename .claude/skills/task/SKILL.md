@@ -22,7 +22,7 @@ Entregar a task **$ARGUMENTS** do `../papo-reto-docs/roadmap.md`: a menor soluç
 
 ## Fase 1: Construir com TDD
 1. Branch `task/NN-nome` a partir da `main`.
-2. Para cada ciclo: escrever o teste e rodar só ele (`swift test --filter <Teste>`) → commit `test:` (red) → fazer passar → commit `feat:` → refatorar no verde → commit `refactor:`.
+2. Para cada ciclo: escrever o teste e rodar só ele (`make test FILTER=<Teste>`) → commit `test:` (red) → fazer passar → commit `feat:` → refatorar no verde → commit `refactor:`.
 3. Teste que passa de primeira é teste de caracterização: dizer isso no corpo do commit.
 4. Nunca enfraquecer, pular ou apagar teste para chegar ao verde.
 5. `make test` só nos marcos: fim dos ciclos ou mudança em `Package.swift`, Makefile ou scripts.

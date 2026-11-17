@@ -1,3 +1,7 @@
+public enum AppEvent: Sendable {
+    case modelLoaded
+}
+
 public enum AppState: CaseIterable, Sendable {
     case loading, ready, recording, transcribing
 
@@ -9,5 +13,9 @@ public enum AppState: CaseIterable, Sendable {
         case .recording: "mic.fill"
         case .transcribing: "ellipsis.bubble"
         }
+    }
+
+    public func handling(_ event: AppEvent) -> AppState {
+        .ready
     }
 }

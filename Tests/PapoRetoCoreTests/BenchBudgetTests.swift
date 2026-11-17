@@ -3,18 +3,14 @@ import PapoRetoCore
 
 private let budget = BenchBudget.reference
 
-@Test func loadUnder5sIsWithinBudget() {
-    #expect(budget.violations(loadSeconds: 4.99, latenciesPer10s: [1.49], footprintMB: 899.9).isEmpty)
+@Test func justUnderEveryLimitIsWithinBudget() {
+    #expect(budget.violations(loadSeconds: 4.99, latenciesPer10s: [0.9, 1.49], footprintMB: 899.9).isEmpty)
 }
 
 @Test func loadOf5sBreaksTheBudget() {
     let violations = budget.violations(loadSeconds: 5, latenciesPer10s: [1.49], footprintMB: 899.9)
     #expect(violations.count == 1)
     #expect(violations.first?.contains("load 5.00 s") == true)
-}
-
-@Test func everyFileUnder1_5sPer10sIsWithinBudget() {
-    #expect(budget.violations(loadSeconds: 4.99, latenciesPer10s: [0.9, 1.49], footprintMB: 899.9).isEmpty)
 }
 
 @Test func oneFileAt1_5sPer10sBreaksTheBudget() {

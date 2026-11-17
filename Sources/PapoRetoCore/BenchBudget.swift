@@ -12,13 +12,13 @@ public struct BenchBudget: Sendable {
     public func violations(loadSeconds: Double, latenciesPer10s: [Double], footprintMB: Double) -> [String] {
         var found: [String] = []
         if loadSeconds >= maxLoadSeconds {
-            found.append(String(format: "load %.2f s (limit < %.0f s)", loadSeconds, maxLoadSeconds))
+            found.append(String(format: "load %.2f s (limit < %g s)", loadSeconds, maxLoadSeconds))
         }
         if let worst = latenciesPer10s.max(), worst >= maxLatencyPer10s {
-            found.append(String(format: "latency %.2f s per 10 s in the slowest file (limit < %.1f s)", worst, maxLatencyPer10s))
+            found.append(String(format: "latency %.2f s per 10 s in the slowest file (limit < %g s)", worst, maxLatencyPer10s))
         }
         if footprintMB >= maxFootprintMB {
-            found.append(String(format: "footprint %.0f MB after transcribing (limit < %.0f MB)", footprintMB, maxFootprintMB))
+            found.append(String(format: "footprint %.1f MB after transcribing (limit < %g MB)", footprintMB, maxFootprintMB))
         }
         return found
     }

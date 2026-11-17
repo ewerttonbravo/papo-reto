@@ -25,6 +25,17 @@ else
 		END { if (!ok) { print "Gate: coverage report not found."; exit 1 } }'
 endif
 
+BENCH_AUDIO ?= ../papo-reto-docs/bench/audio
+BENCH_PHRASE := Bom dia, pessoal. Hoje eu quero falar sobre como a inteligência artificial pode ajudar \
+	pequenas empresas a vender mais, sem gastar muito com ferramentas caras.
+
+.PHONY: bench
+bench: $(SHERPA_LIB)
+	swift build -c release --product papo-reto-bench
+	mkdir -p build
+	say -v Luciana -o build/luciana.wav --data-format=LEI16@16000 "$(BENCH_PHRASE)"
+	"$$(swift build -c release --show-bin-path)/papo-reto-bench" build/luciana.wav $(BENCH_AUDIO)/*.wav
+
 .PHONY: app run
 app:
 	swift build -c release --product PapoReto

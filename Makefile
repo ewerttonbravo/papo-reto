@@ -46,7 +46,7 @@ bench: $(SHERPA_LIB)
 	echo "== $$pass/3 runs within budget"; [ $$pass -ge 2 ]
 
 .PHONY: app run
-app:
+app: $(SHERPA_LIB)
 	swift build -c release --product PapoReto
 	rm -rf build/PapoReto.app
 	mkdir -p build/PapoReto.app/Contents/MacOS

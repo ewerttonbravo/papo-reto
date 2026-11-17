@@ -2,7 +2,8 @@ import CSherpaOnnx
 import Foundation
 
 /// Parakeet TDT v3 through the sherpa-onnx C API. Load once, then one stream per transcription.
-public final class Transcriber {
+/// Sendable so it can be loaded off the main thread; callers keep transcriptions serialized.
+public final class Transcriber: @unchecked Sendable {
     public static let defaultModelDir = FileManager.default
         .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("PapoReto/Models/parakeet-tdt-0.6b-v3-int8")

@@ -34,23 +34,26 @@ Swift 6 · AppKit · SwiftPM (no Xcode project, no SwiftUI, no third-party Swift
 | Target | Contents | May import |
 |---|---|---|
 | `PapoRetoCore` | Pure logic: state machine, `Fn` gesture (injected clock), silence discarding, SHA-256 verification, final text, ports (protocols) | Foundation only |
-| `PapoReto` | App + thin adapters: `StatusMenu`, `FnKeyMonitor` (CGEventTap), `AudioRecorder` (AVAudioEngine), `AudioDevices` (Core Audio), `Transcriber` (sherpa), `ModelStore` (download), `Paster` | anything + Core |
-| `CSherpaOnnx` | module map for `c-api.h` | — |
+| `PapoReto` | App + thin adapters: `StatusMenu`, `FnKeyMonitor` (CGEventTap), `AudioRecorder` (AVAudioEngine), `AudioDevices` (Core Audio), `ModelStore` (download), `Paster` | anything + Core |
+| `PapoRetoSherpa` | `Transcriber` (sherpa), shared by the app and the bench | `CSherpaOnnx` |
+| `papo-reto-bench` | CLI: text, latency and RAM per WAV | `PapoRetoSherpa` |
+| `CSherpaOnnx` | module map for `vendor/sherpa-onnx/include/c-api.h` | — |
 
 The compiler prevents the Core from importing the app. Every state transition goes through the Core state machine; no adapter changes state on its own.
 
 ## Known pitfalls
-- **Model:** loads once in the background when the app opens; reuse the `OfflineRecognizer` and create one stream per transcription; `num_threads` = `hw.physicalcpu`. An `Fn` press before the load finishes records normally and transcribes when the model is ready.
+- **Model:** loads once in the background when the app opens; reuse the `OfflineRecognizer` and create one stream per transcription; `num_threads` = `hw.physicalcpu`. Files in `~/Library/Application Support/PapoReto/Models/parakeet-tdt-0.6b-v3-int8/`; libs and model come from `scripts/fetch-deps.sh` (SHA-256 pinned). An `Fn` press before the load finishes records normally and transcribes when the model is ready.
 - **Audio:** the engine runs only while recording. The microphone is selected with `kAudioOutputUnitProperty_CurrentDevice` and persisted by UID, falling back to the default if the device disappears. Convert to 16 kHz mono Float32 in memory, never on disk. Measure hands-free with 2 min of speech before deciding on VAD.
 - **Fn:** CGEventTap on `flagsChanged` + `keyDown` (`.maskSecondaryFn`). Start recording on keydown and discard if it was a short tap. Fn+key cancels. Re-enable after `tapDisabledByTimeout`. Tell the user: "Press 🌐 key to" ("Pressionar tecla 🌐 para") → "Do Nothing" ("Não fazer nada").
 - **Paste:** save the whole pasteboard, write with `org.nspasteboard.TransientType`, send Cmd+V via CGEvent and restore after ~250 ms.
 - **Permissions:** TCC ties the permission to the signature. Ad-hoc resets on every build, so development uses the self-signed certificate "Papo Reto Dev" (ADR-006).
+- **WAV:** the sherpa reader rejects `WAVE_FORMAT_EXTENSIBLE` (what `afconvert` writes); convert reference audio with `ffmpeg -ac 1 -ar 16000 -c:a pcm_s16le`.
 - **Language:** v3 detects the language on its own and was trained with more European Portuguese; watch for short phrases coming out in Spanish.
 
 ## Performance budget (measure on the reference Mac)
 | Metric | Target |
 |---|---|
-| Resident RAM with the model, idle | < 800 MB (provisional; T01 sets the native number) |
+| Physical footprint with the model, idle after a transcription | < 900 MB (T01: 460 MB after load, 889 MB after the first transcription) |
 | Idle CPU | ~0% |
 | Release `Fn` → text pasted, 10 s of speech | < 1.5 s (sherpa measured: 0.8 s) |
 | Model load at launch | < 5 s, in the background, without freezing the menu bar |
@@ -65,11 +68,11 @@ The compiler prevents the Core from importing the app. Every state transition go
 
 ## Gates
 - `make test`: `swift test` + 100% line coverage on `PapoRetoCore` (llvm-cov), failing the build below that.
-- `make bench` (task that touches audio or the model): text, latency and RAM of the reference WAVs against the budget.
+- `make bench` (task that touches audio or the model): text, latency and RAM of the reference WAVs, compared against the budget (automatic verdict: T01b).
 - CI (GitHub Actions, macOS): `make test`.
 
 ## Commands
-`make test` · `make test FILTER=<Test>` (one test, no coverage; with the CLT, plain `swift test` cannot find Swift Testing) · `make app` (assembles and signs the `.app`) · `make run`. To be created: `make bench` (T01), `make install` (T09), `make release` (T10).
+`make test` · `make test FILTER=<Test>` (one test, no coverage; with the CLT, plain `swift test` cannot find Swift Testing) · `make app` (assembles and signs the `.app`) · `make run` · `make bench` (real WAVs from `BENCH_AUDIO`, default `../papo-reto-docs/bench/audio`). To be created: `make install` (T09), `make release` (T10).
 
 ## Conventions
 - Everything in this repo is in English: code, names, comments, UI, README, commits and PRs. `../papo-reto-docs` stays in PT-BR.

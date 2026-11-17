@@ -10,10 +10,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var state = AppState.loading
     private var transcriber: Transcriber?
+    private let unavailableItem = NSMenuItem(title: "Model not found. Run scripts/fetch-deps.sh model", action: nil, keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
+        menu.addItem(unavailableItem)
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
@@ -26,11 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let start = ContinuousClock.now
             let transcriber = Transcriber()
             let elapsed = ContinuousClock.now - start
-            // In the app (not in the bench) ~220 MB freed by the load stay dirty in the
-            // footprint until malloc is asked to give them back: 609-692 MB → 449 MB.
-            malloc_zone_pressure_relief(nil, 0)
             if transcriber == nil {
-                log.error("model failed to load from \(Transcriber.defaultModelDir.path, privacy: .public)")
+                log.error("model failed to load from \(Transcriber.defaultModelDir.path)")
             } else {
                 log.info("model loaded in \(elapsed, privacy: .public)")
             }
@@ -41,11 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func modelDidLoad(_ transcriber: Transcriber?) {
         self.transcriber = transcriber
         state = state.handling(transcriber == nil ? .modelFailed : .modelLoaded)
-        if state == .modelUnavailable {
-            let item = NSMenuItem(title: "Model not found. Run scripts/fetch-deps.sh model", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            statusItem?.menu?.insertItem(item, at: 0)
-        }
         render()
     }
 
@@ -55,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.button?.image = image
         // An unknown symbol name yields nil: show text so the menu (and "Quit") stays reachable.
         statusItem?.button?.title = image == nil ? "PR" : ""
+        unavailableItem.isHidden = state != .modelUnavailable
     }
 }
 

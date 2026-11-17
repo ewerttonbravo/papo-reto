@@ -53,7 +53,7 @@ The compiler prevents the Core from importing the app. Every state transition go
 ## Performance budget (measure on the reference Mac)
 | Metric | Target |
 |---|---|
-| Physical footprint with the model, idle after a transcription | < 900 MB (T01: 460 MB after load, 889 MB after the first transcription) |
+| Physical footprint with the model, idle after a transcription | < 900 MB (T01: 460 MB after load, 889 MB after ≤ 28 s clips; longer audio keeps it higher, 103 s → 1.9 GB, until T05b recreates the recognizer) |
 | Idle CPU | ~0% |
 | Release `Fn` → text pasted, 10 s of speech | < 1.5 s (sherpa measured: 0.8 s) |
 | Model load at launch | < 5 s, in the background, without freezing the menu bar |

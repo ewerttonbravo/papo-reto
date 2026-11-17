@@ -40,7 +40,8 @@ bench: $(SHERPA_LIB)
 	@BIN="$$(swift build -c release --show-bin-path)/papo-reto-bench"; pass=0; \
 	for run in 1 2 3; do \
 		echo "== run $$run/3"; \
-		"$$BIN" build/luciana.wav "$(BENCH_AUDIO)"/*.wav && pass=$$((pass + 1)); \
+		"$$BIN" build/luciana.wav "$(BENCH_AUDIO)"/*.wav; code=$$?; \
+		if [ $$code -eq 0 ]; then pass=$$((pass + 1)); elif [ $$code -ne 3 ]; then exit $$code; fi; \
 	done; \
 	echo "== $$pass/3 runs within budget"; [ $$pass -ge 2 ]
 

@@ -47,20 +47,25 @@ for file in files {
     let w = wave.pointee
     let samples = Array(UnsafeBufferPointer(start: w.samples, count: Int(w.num_samples)))
     let audio = Double(w.num_samples) / Double(w.sample_rate)
+    guard audio > 0 else {
+        print("\(file): empty WAV")
+        exit(1)
+    }
 
     let start = ContinuousClock.now
     let text = transcriber.transcribe(samples: samples, sampleRate: w.sample_rate)
     let latency = seconds(since: start)
-    latenciesPer10s.append(latency * 10 / audio)
-    print(String(format: "%@ · audio %.1f s · %.2f s · %.2f s per 10 s", (file as NSString).lastPathComponent, audio, latency, latenciesPer10s.last!))
+    let per10s = latency * 10 / audio
+    latenciesPer10s.append(per10s)
+    print(String(format: "%@ · audio %.1f s · %.2f s · %.2f s per 10 s", (file as NSString).lastPathComponent, audio, latency, per10s))
     print("  \(text)")
 }
 let end = memory()
-print(String(format: "after transcribing: footprint %.0f MB · peak %.0f MB · resident %.0f MB", end.footprint, end.peak, end.resident))
+print(String(format: "after transcribing: footprint %.1f MB · peak %.0f MB · resident %.0f MB", end.footprint, end.peak, end.resident))
 
 let violations = BenchBudget.reference.violations(loadSeconds: loadSeconds, latenciesPer10s: latenciesPer10s, footprintMB: end.footprint)
 guard violations.isEmpty else {
     violations.forEach { print("over budget: \($0)") }
-    exit(1)
+    exit(3)  // make bench tells a budget miss (3) from a setup error (1, 2)
 }
 print("within budget")

@@ -14,3 +14,8 @@ import PapoRetoCore
 @Test func modelFailedWhileLoadingGoesModelUnavailable() {
     #expect(AppState.loading.handling(.modelFailed) == .modelUnavailable)
 }
+
+@Test func modelEventsOutsideLoadingKeepTheState() {
+    #expect(AppState.ready.handling(.modelFailed) == .ready)
+    #expect(AppState.recording.handling(.modelLoaded) == .recording)
+}

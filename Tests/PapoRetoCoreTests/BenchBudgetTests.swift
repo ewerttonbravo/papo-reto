@@ -22,3 +22,13 @@ private let budget = BenchBudget.reference
     #expect(violations.count == 1)
     #expect(violations.first?.contains("latency 1.50 s per 10 s") == true)
 }
+
+@Test func footprintOf900MBBreaksTheBudget() {
+    let violations = budget.violations(loadSeconds: 4.99, latenciesPer10s: [1.49], footprintMB: 900)
+    #expect(violations.count == 1)
+    #expect(violations.first?.contains("footprint 900 MB") == true)
+}
+
+@Test func everyMetricOverReportsThreeViolations() {
+    #expect(budget.violations(loadSeconds: 5, latenciesPer10s: [1.5], footprintMB: 900).count == 3)
+}

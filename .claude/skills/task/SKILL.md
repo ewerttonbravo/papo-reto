@@ -1,22 +1,24 @@
 ---
 name: task
-description: Runs a Papo Reto task end to end, from elucidation to PR. Use only when the user invokes /task with the number of a row in ../papo-reto-docs/roadmap.md.
-argument-hint: <task-number>
+description: Runs a Papo Reto task end to end, from elucidation to PR. Use only when the user invokes /task, optionally with the number of a row in ../papo-reto-docs/roadmap.md.
+argument-hint: "[task-number]"
 disable-model-invocation: true
 ---
 
-# Task $ARGUMENTS
+# Task
 
-Deliver task **$ARGUMENTS** from `../papo-reto-docs/roadmap.md`: the smallest solution that delivers the behavior, test first, small PR. The rules in `CLAUDE.md` apply in full. Each phase ends at a gate; if the gate fails, the task stops: fix or ask, never skip.
+Which task: **$ARGUMENTS** if a number was given; otherwise the next in sequence, i.e. the first row of the task table in `../papo-reto-docs/roadmap.md`, in table order, without a `../papo-reto-docs/tasks/NN-*.md` marked `Status: fechada`. Say in 1 line which task was picked and why.
+
+Deliver that task from `../papo-reto-docs/roadmap.md`: the smallest solution that delivers the behavior, test first, small PR. The rules in `CLAUDE.md` apply in full. Each phase ends at a gate; if the gate fails, the task stops: fix or ask, never skip.
 
 ## Phase 0: Elucidate (before any code)
-1. State: read `../papo-reto-docs/estado.md` and row $ARGUMENTS of the roadmap. Check that git is on `main`, clean and in sync (`git fetch`), and that `gh pr list` shows no open PR from another task.
+1. State: read `../papo-reto-docs/estado.md` and the task's row in the roadmap. Check that git is on `main`, clean and in sync (`git fetch`), and that `gh pr list` shows no open PR from another task.
 2. What binds the task: ADRs involved, performance budget rows and related trade-offs.
 3. Prerequisites: list external data and tools (model, sherpa libs, reference WAVs, permissions, toolchain). Check that they exist; anything missing becomes a question before installing anything.
 4. Gaps that change the outcome become closed questions (`AskUserQuestion`, named options, recommended first).
 5. Cycles: at most ~3, each = 1 TDD cycle named after a behavior.
 6. Size gate: 1 observable behavior and diff ≤ ~200 lines with tests. If it goes over, propose the split to Mr. Bravo; the roadmap only changes with his approval.
-7. Write `../papo-reto-docs/tasks/NN-name.md` (in PT-BR, like the rest of the docs repo) with: context, cycles, tests (behavior and guard against false positives), manual checklist for the adapters touched and Given/When/Then criteria. Commit and push in the docs repo.
+7. Write `../papo-reto-docs/tasks/NN-name.md` (in PT-BR, like the rest of the docs repo) with `Status: plano` and: context, cycles, tests (behavior and guard against false positives), manual checklist for the adapters touched and Given/When/Then criteria. Commit and push in the docs repo.
 
 **Gate:** no open question that changes the outcome; Mr. Bravo approves the plan (`EnterPlanMode` → `ExitPlanMode`).
 
@@ -47,7 +49,7 @@ Deliver task **$ARGUMENTS** from `../papo-reto-docs/roadmap.md`: the smallest so
 6. `README.md`: update only if how to install, run or use changed.
 7. Push and open a PR against `main` with the body below. Wait for green CI.
 8. Report to Mr. Bravo: PR link, evidence per criterion and deviations. Merge (merge commit) only with his explicit OK.
-9. After the merge: overwrite `../papo-reto-docs/estado.md`, record the closing in `tasks/NN-name.md`, commit and push in the docs repo. Write `../papo-reto-docs/notes/linkedin/NN-name.md` in the format of the README there and index it (outside git).
+9. After the merge: overwrite `../papo-reto-docs/estado.md`, record the closing in `tasks/NN-name.md` and set it to `Status: fechada` (this is what picks the next task), commit and push in the docs repo. Write `../papo-reto-docs/notes/linkedin/NN-name.md` in the format of the README there and index it (outside git).
 
 **Gate:** green CI, every criterion with evidence, every finding handled, LinkedIn note written.
 

@@ -57,7 +57,7 @@ The compiler prevents the Core from importing the app. Every state transition go
 | `.app` per architecture, without the model | < 45 MB |
 
 ## Process (ADR-008)
-- **Tasks**: roadmap in `../papo-reto-docs/roadmap.md`; each task runs through the `/task NN` skill (elucidate → TDD → PR). 1 observable behavior, diff ≤ ~200 lines with tests.
+- **Tasks**: roadmap in `../papo-reto-docs/roadmap.md`; each task runs through the `/task` skill (next in sequence, or `/task NN`; elucidate → TDD → PR). 1 observable behavior, diff ≤ ~200 lines with tests.
 - **TDD**: red → green → refactor, one cycle per behavior, test always first.
 - **KISS/DRY**: the minimal solution that passes the test; abstraction only on the 2nd real use.
 - Core tests: Swift Testing, pure unit tests, in-memory fakes, test name = rule (`fnHeldOver300msStartsPushToTalk`). No sleep: injected clock.

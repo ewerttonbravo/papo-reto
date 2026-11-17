@@ -17,9 +17,10 @@ public enum AppState: CaseIterable, Sendable {
     }
 
     public func handling(_ event: AppEvent) -> AppState {
-        switch event {
-        case .modelLoaded: .ready
-        case .modelFailed: .modelUnavailable
+        switch (self, event) {
+        case (.loading, .modelLoaded): .ready
+        case (.loading, .modelFailed): .modelUnavailable
+        default: self
         }
     }
 }

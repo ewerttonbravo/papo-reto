@@ -14,7 +14,7 @@ private let budget = BenchBudget.reference
 }
 
 @Test func oneFileAt1_5sPer10sBreaksTheBudget() {
-    let violations = budget.violations(loadSeconds: 4.99, latenciesPer10s: [1.5, 0.9], footprintMB: 899.9)
+    let violations = budget.violations(loadSeconds: 4.99, latenciesPer10s: [0.9, 1.5, 1.0], footprintMB: 899.9)
     #expect(violations.count == 1)
     #expect(violations.first?.contains("latency 1.50 s per 10 s") == true)
 }

@@ -68,7 +68,7 @@ The compiler prevents the Core from importing the app. Every state transition go
 
 ## Gates
 - `make test`: `swift test` + 100% line coverage on `PapoRetoCore` (llvm-cov), failing the build below that.
-- `make bench` (task that touches audio or the model): text, latency and RAM of the reference WAVs, compared against the budget (automatic verdict: T01b).
+- `make bench` (task that touches audio or the model): text, latency and RAM of the reference WAVs; 3 runs, fails unless 2 stay within budget (load, slowest file, final footprint). Measure with Colima stopped: with it running the footprint jumps to 1,052-1,126 MB.
 - CI (GitHub Actions, macOS): `make test`.
 
 ## Commands

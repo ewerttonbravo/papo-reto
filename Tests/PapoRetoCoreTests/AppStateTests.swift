@@ -10,3 +10,7 @@ import PapoRetoCore
 @Test func modelLoadedWhileLoadingGoesReady() {
     #expect(AppState.loading.handling(.modelLoaded) == .ready)
 }
+
+@Test func modelFailedWhileLoadingGoesModelUnavailable() {
+    #expect(AppState.loading.handling(.modelFailed) == .modelUnavailable)
+}

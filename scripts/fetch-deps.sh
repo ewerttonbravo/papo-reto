@@ -13,7 +13,7 @@ fetch() {
   [ -f "$3" ] && return
   mkdir -p "$(dirname "$3")"
   echo "Downloading $(basename "$3")"
-  curl -fL --progress-bar -o "$3.part" "$1"
+  curl -fL --retry 3 --progress-bar -o "$3.part" "$1" || { rm -f "$3.part"; exit 1; }
   if [ "$(shasum -a 256 "$3.part" | cut -d' ' -f1)" != "$2" ]; then
     rm -f "$3.part"
     echo "SHA-256 mismatch for $1" >&2
@@ -27,12 +27,20 @@ libs)
   case "$(uname -m)" in
   x86_64) arch=x64 sha=b0107b8166c4131245380bc9b984345c4ea8637c65807f09ca5f501c72926be5 ;;
   arm64) arch=arm64 sha=ac5594ad237db56ec4a6c4b3fc48700441b33a07bb71c235f35530a52a93f2e3 ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
   esac
   name=sherpa-onnx-$SHERPA-osx-$arch-shared-no-tts-lib
   fetch "$SHERPA_URL/releases/download/$SHERPA/$name.tar.bz2" "$sha" "$VENDOR/$name.tar.bz2"
   fetch "$SHERPA_URL/raw/$SHERPA/sherpa-onnx/c-api/c-api.h" \
     5698f38ba09ad2bdf085c56a6cbbd7741acf15e25f4ce5c7097b9702cadf437f "$VENDOR/include/c-api.h"
-  [ -d "$VENDOR/lib" ] || tar -xjf "$VENDOR/$name.tar.bz2" -C "$VENDOR" --strip-components 1 "$name/lib"
+  # The stamp names the architecture, so a half extraction or another arch's libs get replaced.
+  if [ ! -f "$VENDOR/lib/.$arch" ]; then
+    rm -rf "$VENDOR/lib" "$VENDOR/lib.tmp"
+    mkdir "$VENDOR/lib.tmp"
+    tar -xjf "$VENDOR/$name.tar.bz2" -C "$VENDOR/lib.tmp" --strip-components 2 "$name/lib"
+    touch "$VENDOR/lib.tmp/.$arch"
+    mv "$VENDOR/lib.tmp" "$VENDOR/lib"
+  fi
   ;;
 model)
   fetch "$MODEL_URL/encoder.int8.onnx" 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479 "$MODEL_DIR/encoder.int8.onnx"

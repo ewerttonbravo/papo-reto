@@ -36,7 +36,7 @@ Swift 6 · AppKit · SwiftPM (no Xcode project, no SwiftUI, no third-party Swift
 | `PapoRetoCore` | Pure logic: state machine, `Fn` gesture (injected clock), silence discarding, SHA-256 verification, final text, ports (protocols) | Foundation only |
 | `PapoReto` | App + thin adapters: `StatusMenu`, `FnKeyMonitor` (CGEventTap), `AudioRecorder` (AVAudioEngine), `AudioDevices` (Core Audio), `ModelStore` (download), `Paster` | anything + Core |
 | `PapoRetoSherpa` | `Transcriber` (sherpa), shared by the app and the bench | `CSherpaOnnx` |
-| `papo-reto-bench` | CLI: text, latency and RAM per WAV | `PapoRetoSherpa` |
+| `papo-reto-bench` | CLI: text, latency and RAM per WAV | `PapoRetoSherpa`, `CSherpaOnnx` (WAV reader) |
 | `CSherpaOnnx` | module map for `vendor/sherpa-onnx/include/c-api.h` | — |
 
 The compiler prevents the Core from importing the app. Every state transition goes through the Core state machine; no adapter changes state on its own.

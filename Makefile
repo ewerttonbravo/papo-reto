@@ -6,9 +6,10 @@ TESTING_FLAGS := -Xswiftc -F$(CLT)/Library/Developer/Frameworks \
 	-Xlinker -rpath -Xlinker $(CLT)/Library/Developer/usr/lib
 endif
 
-SHERPA_LIB := vendor/sherpa-onnx/lib
+SHERPA_ARCH := $(if $(filter x86_64,$(shell uname -m)),x64,arm64)
+SHERPA_LIB := vendor/sherpa-onnx/lib/.$(SHERPA_ARCH)
 
-$(SHERPA_LIB):
+$(SHERPA_LIB): scripts/fetch-deps.sh
 	scripts/fetch-deps.sh libs
 
 .PHONY: test
@@ -32,9 +33,10 @@ BENCH_PHRASE := Bom dia, pessoal. Hoje eu quero falar sobre como a inteligência
 .PHONY: bench
 bench: $(SHERPA_LIB)
 	swift build -c release --product papo-reto-bench
+	@ls "$(BENCH_AUDIO)"/*.wav >/dev/null 2>&1 || { echo "No WAVs in BENCH_AUDIO=$(BENCH_AUDIO)"; exit 1; }
 	mkdir -p build
 	say -v Luciana -o build/luciana.wav --data-format=LEI16@16000 "$(BENCH_PHRASE)"
-	"$$(swift build -c release --show-bin-path)/papo-reto-bench" build/luciana.wav $(BENCH_AUDIO)/*.wav
+	"$$(swift build -c release --show-bin-path)/papo-reto-bench" build/luciana.wav "$(BENCH_AUDIO)"/*.wav
 
 .PHONY: app run
 app:

@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     targets: [
         .target(name: "PapoRetoCore"),
+        .executableTarget(name: "PapoReto", dependencies: ["PapoRetoCore"]),
         .testTarget(name: "PapoRetoCoreTests", dependencies: ["PapoRetoCore"]),
     ]
 )

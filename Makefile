@@ -19,3 +19,15 @@ else
 		if ($$10 != "100.00%") { print "Gate: o Core precisa de 100% de linha."; exit 1 } } \
 		END { if (!ok) { print "Gate: relatório de cobertura não encontrado."; exit 1 } }'
 endif
+
+.PHONY: app run
+app:
+	swift build -c release --product PapoReto
+	rm -rf build/PapoReto.app
+	mkdir -p build/PapoReto.app/Contents/MacOS
+	cp "$$(swift build -c release --show-bin-path)/PapoReto" build/PapoReto.app/Contents/MacOS/
+	cp Resources/Info.plist build/PapoReto.app/Contents/
+	codesign --force --sign - build/PapoReto.app
+
+run: app
+	open build/PapoReto.app

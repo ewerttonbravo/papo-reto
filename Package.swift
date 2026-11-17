@@ -18,7 +18,7 @@ let package = Package(
             linkerSettings: [.unsafeFlags(["-L\(sherpaLib)", "-Xlinker", "-rpath", "-Xlinker", sherpaLib])]
         ),
         .executableTarget(name: "PapoReto", dependencies: ["PapoRetoCore"]),
-        .executableTarget(name: "papo-reto-bench", dependencies: ["PapoRetoSherpa", "CSherpaOnnx"]),
+        .executableTarget(name: "papo-reto-bench", dependencies: ["PapoRetoCore", "PapoRetoSherpa", "CSherpaOnnx"]),
         .testTarget(name: "PapoRetoCoreTests", dependencies: ["PapoRetoCore"]),
     ]
 )

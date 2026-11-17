@@ -9,7 +9,7 @@ Requer macOS 13+ e as Command Line Tools (`xcode-select --install`) ou o Xcode.
 
 ```sh
 make test   # testes + 100% de cobertura de linha no PapoRetoCore
-make app    # gera build/PapoReto.app (assinatura ad-hoc)
+make app    # gera build/PapoReto.app para uso local
 make run    # gera e abre o app
 ```
 

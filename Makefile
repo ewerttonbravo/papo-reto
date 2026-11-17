@@ -6,8 +6,13 @@ TESTING_FLAGS := -Xswiftc -F$(CLT)/Library/Developer/Frameworks \
 	-Xlinker -rpath -Xlinker $(CLT)/Library/Developer/usr/lib
 endif
 
+SHERPA_LIB := vendor/sherpa-onnx/lib
+
+$(SHERPA_LIB):
+	scripts/fetch-deps.sh libs
+
 .PHONY: test
-test:
+test: $(SHERPA_LIB)
 ifdef FILTER
 	swift test $(TESTING_FLAGS) --filter '$(FILTER)'
 else

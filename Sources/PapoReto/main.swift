@@ -28,6 +28,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let start = ContinuousClock.now
             let transcriber = Transcriber()
             let elapsed = ContinuousClock.now - start
+            // In the app, ~220 MB freed by the load stay counted in the footprint until malloc
+            // gives them back (609-692 MB → 450 MB). Not in Transcriber: in the bench the same
+            // call adds ~7 MB after transcribing (891.5 → 899 MB, limit 900).
+            malloc_zone_pressure_relief(nil, 0)
             if transcriber == nil {
                 log.error("model failed to load from \(Transcriber.defaultModelDir.path)")
             } else {

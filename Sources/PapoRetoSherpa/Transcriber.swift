@@ -33,9 +33,6 @@ public final class Transcriber {
 
         guard let recognizer = SherpaOnnxCreateOfflineRecognizer(&config) else { return nil }
         self.recognizer = recognizer
-        // The load frees ~220 MB that, in the app, stayed counted in the footprint until
-        // malloc was asked to give them back (609-692 MB → 449 MB after load).
-        malloc_zone_pressure_relief(nil, 0)
     }
 
     deinit { SherpaOnnxDestroyOfflineRecognizer(recognizer) }

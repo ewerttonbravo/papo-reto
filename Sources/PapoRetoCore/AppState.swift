@@ -1,5 +1,13 @@
 public enum AppState: CaseIterable, Sendable {
     case loading, ready, recording, transcribing
 
-    public var iconName: String { "" }
+    /// SF Symbol shown in the menu bar.
+    public var iconName: String {
+        switch self {
+        case .loading: "hourglass"
+        case .ready: "mic"
+        case .recording: "mic.fill"
+        case .transcribing: "ellipsis.bubble"
+        }
+    }
 }

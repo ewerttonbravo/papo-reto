@@ -1,84 +1,84 @@
 ---
 name: task
-description: Executa uma task do Papo Reto de ponta a ponta, da elucidação ao PR. Usar só quando o usuário invocar /task com o número de uma linha de ../papo-reto-docs/roadmap.md.
-argument-hint: <numero-da-task>
+description: Runs a Papo Reto task end to end, from elucidation to PR. Use only when the user invokes /task with the number of a row in ../papo-reto-docs/roadmap.md.
+argument-hint: <task-number>
 disable-model-invocation: true
 ---
 
 # Task $ARGUMENTS
 
-Entregar a task **$ARGUMENTS** do `../papo-reto-docs/roadmap.md`: a menor solução que entrega o comportamento, com teste primeiro e PR pequeno. As regras do `CLAUDE.md` valem integralmente. Cada fase termina num gate; se o gate falha, a task para: corrigir ou perguntar, nunca pular.
+Deliver task **$ARGUMENTS** from `../papo-reto-docs/roadmap.md`: the smallest solution that delivers the behavior, test first, small PR. The rules in `CLAUDE.md` apply in full. Each phase ends at a gate; if the gate fails, the task stops: fix or ask, never skip.
 
-## Fase 0: Elucidar (antes de qualquer código)
-1. Estado: ler `../papo-reto-docs/estado.md` e a linha $ARGUMENTS do roadmap. Conferir que o git está na `main`, limpo e sincronizado (`git fetch`), e que `gh pr list` não mostra PR aberto de outra task.
-2. O que amarra a task: ADRs envolvidos, linhas do orçamento de performance e trade-offs relacionados.
-3. Pré-requisitos: listar dados e ferramentas externos (modelo, libs do sherpa, WAVs de referência, permissões, toolchain). Checar se existem; o que faltar vira pergunta antes de instalar qualquer coisa.
-4. Lacunas que mudam o resultado viram perguntas fechadas (`AskUserQuestion`, opções nomeadas, a recomendada primeiro).
-5. Ciclos: no máximo ~3, cada um = 1 ciclo TDD com nome de comportamento.
-6. Size gate: 1 comportamento observável e diff ≤ ~200 linhas com testes. Se passar disso, propor a divisão ao Mr. Bravo; o roadmap só muda com a aprovação dele.
-7. Gravar `../papo-reto-docs/tasks/NN-nome.md` com: contexto, ciclos, testes (comportamento e guarda contra falso positivo), checklist manual dos adapters tocados e critérios Given/When/Then. Commit e push no repo de docs.
+## Phase 0: Elucidate (before any code)
+1. State: read `../papo-reto-docs/estado.md` and row $ARGUMENTS of the roadmap. Check that git is on `main`, clean and in sync (`git fetch`), and that `gh pr list` shows no open PR from another task.
+2. What binds the task: ADRs involved, performance budget rows and related trade-offs.
+3. Prerequisites: list external data and tools (model, sherpa libs, reference WAVs, permissions, toolchain). Check that they exist; anything missing becomes a question before installing anything.
+4. Gaps that change the outcome become closed questions (`AskUserQuestion`, named options, recommended first).
+5. Cycles: at most ~3, each = 1 TDD cycle named after a behavior.
+6. Size gate: 1 observable behavior and diff ≤ ~200 lines with tests. If it goes over, propose the split to Mr. Bravo; the roadmap only changes with his approval.
+7. Write `../papo-reto-docs/tasks/NN-name.md` (in PT-BR, like the rest of the docs repo) with: context, cycles, tests (behavior and guard against false positives), manual checklist for the adapters touched and Given/When/Then criteria. Commit and push in the docs repo.
 
-**Gate:** nenhuma pergunta aberta que mude o resultado; Mr. Bravo aprova o plano (`EnterPlanMode` → `ExitPlanMode`).
+**Gate:** no open question that changes the outcome; Mr. Bravo approves the plan (`EnterPlanMode` → `ExitPlanMode`).
 
-## Fase 1: Construir com TDD
-1. Branch `task/NN-nome` a partir da `main`.
-2. Para cada ciclo: escrever o teste e rodar só ele (`make test FILTER=<Teste>`) → commit `test:` (red) → fazer passar → commit `feat:` → refatorar no verde → commit `refactor:`.
-3. Teste que passa de primeira é teste de caracterização: dizer isso no corpo do commit.
-4. Nunca enfraquecer, pular ou apagar teste para chegar ao verde.
-5. `make test` só nos marcos: fim dos ciclos ou mudança em `Package.swift`, Makefile ou scripts.
-6. Desvio do plano que muda o resultado: parar e perguntar. Outro desvio: registrar no corpo do commit.
+## Phase 1: Build with TDD
+1. Branch `task/NN-name` from `main`.
+2. For each cycle: write the test and run only it (`make test FILTER=<Test>`) → `test:` commit (red) → make it pass → `feat:` commit → refactor on green → `refactor:` commit.
+3. A test that passes on the first run is a characterization test: say so in the commit body.
+4. Never weaken, skip or delete a test to get to green.
+5. `make test` only at milestones: end of the cycles or a change to `Package.swift`, the Makefile or scripts.
+6. A deviation from the plan that changes the outcome: stop and ask. Any other deviation: record it in the commit body.
 
-**Gate:** todos os ciclos commitados na ordem red/green e `make test` verde.
+**Gate:** all cycles committed in red/green order and `make test` green.
 
-## Fase 2: Testes que importam (checar contra o diff)
-- Um comportamento por teste, nomeado pela regra. O teste falharia se a linha coberta fosse apagada ou invertida?
-- Fronteiras explícitas: 299/300/301 ms no gesto do `Fn`, 399/400 ms no duplo toque, 0,4 s de áudio, limiar de silêncio.
-- Core: unitário puro, fakes em memória, relógio injetado, sem sleep.
-- Adapter: sem teste de wiring nem de API da Apple. O que é nosso no adapter cabe no checklist manual.
+## Phase 2: Tests that matter (check against the diff)
+- One behavior per test, named after the rule. Would the test fail if the covered line were deleted or inverted?
+- Explicit boundaries: 299/300/301 ms in the `Fn` gesture, 399/400 ms in the double tap, 0.4 s of audio, silence threshold.
+- Core: pure unit tests, in-memory fakes, injected clock, no sleep.
+- Adapter: no wiring tests and no tests of Apple APIs. What is ours in the adapter goes into the manual checklist.
 
-**Gate:** nenhum teste fraco ou supérfluo no diff.
+**Gate:** no weak or superfluous test in the diff.
 
-## Fase 3: Fechamento
-1. `make test` (100% de linha no Core). Se a task mexeu em áudio ou modelo: `make bench`, com os números antes/depois.
-2. Checklist manual dos adapters tocados, executado pelo Mr. Bravo ou com ele, com o resultado anotado.
-3. `/code-review high` no diff da branch. `/security-review` quando tocar permissões, download, event tap ou pasteboard. Cada achado é corrigido com teste primeiro ou justificado no PR.
-4. Coerência plano × entregue: listar o que foi pedido e não entregue.
-5. Decisão nova → ADR; custo aceito novo → linha na tabela de trade-offs (`../papo-reto-docs/README.md`).
-6. `README.md`: atualizar só se mudou como instalar, rodar ou usar.
-7. Push e PR contra a `main` com o corpo abaixo. Esperar o CI verde.
-8. Reportar ao Mr. Bravo: link do PR, evidência por critério e desvios. Merge (merge commit) só com o OK explícito dele.
-9. Depois do merge: sobrescrever `../papo-reto-docs/estado.md`, registrar o fechamento em `tasks/NN-nome.md`, commit e push no repo de docs. Escrever `../papo-reto-docs/notes/linkedin/NN-nome.md` no formato do README de lá e indexar (fora do git).
+## Phase 3: Closing
+1. `make test` (100% line coverage on the Core). If the task touched audio or the model: `make bench`, with before/after numbers.
+2. Manual checklist for the adapters touched, run by Mr. Bravo or with him, with the result recorded.
+3. `/code-review high` on the branch diff. `/security-review` when touching permissions, download, event tap or pasteboard. Each finding is fixed test first or justified in the PR.
+4. Plan × delivered consistency: list what was asked for and not delivered.
+5. New decision → ADR; new accepted cost → row in the trade-off table (`../papo-reto-docs/README.md`).
+6. `README.md`: update only if how to install, run or use changed.
+7. Push and open a PR against `main` with the body below. Wait for green CI.
+8. Report to Mr. Bravo: PR link, evidence per criterion and deviations. Merge (merge commit) only with his explicit OK.
+9. After the merge: overwrite `../papo-reto-docs/estado.md`, record the closing in `tasks/NN-name.md`, commit and push in the docs repo. Write `../papo-reto-docs/notes/linkedin/NN-name.md` in the format of the README there and index it (outside git).
 
-**Gate:** CI verde, todo critério com evidência, todo achado tratado, nota de LinkedIn escrita.
+**Gate:** green CI, every criterion with evidence, every finding handled, LinkedIn note written.
 
-## Corpo do PR
+## PR body
 ```markdown
-## Task NN: <nome>
-<O que o usuário consegue fazer ou medir agora, em 1-2 frases.>
+## Task NN: <name>
+<What the user can do or measure now, in 1-2 sentences.>
 
-### Critérios de aceite
-| # | Critério | Evidência (teste/comando/checklist) |
+### Acceptance criteria
+| # | Criterion | Evidence (test/command/checklist) |
 
-### Trilha de commits
-Commits red e o que cada um provou falhando; caracterizações.
+### Commit trail
+Red commits and what each one proved by failing; characterizations.
 
 ### Performance
-`make bench` antes/depois (ou "não se aplica").
+`make bench` before/after (or "not applicable").
 
-### Revisão
-`/code-review high` (e `/security-review`): achados e tratamento.
+### Review
+`/code-review high` (and `/security-review`): findings and how they were handled.
 
-### Desvios do plano
-<Cada um e o porquê, ou "Nenhum".>
+### Deviations from the plan
+<Each one and why, or "None".>
 
-Plano: ../papo-reto-docs/tasks/NN-nome.md
+Plan: ../papo-reto-docs/tasks/NN-name.md
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
-## Lições herdadas (wallet-service, e-pix)
-- PRs de 1.200 a 2.500 linhas no wallet-service e de ~400 no e-pix: por isso o teto de ~200.
-- Builds completos a cada passo custam tempo: execução direcionada entre marcos.
-- A branch main de uma biblioteca não é o release dela: confirmar o comportamento na versão fixada, publicada há ≥ 2 semanas.
-- Pré-requisito de ferramenta não é garantido (as Command Line Tools já vieram quebradas): checar na Fase 0 e perguntar antes de instalar.
-- Número no CLAUDE.md só depois de medido: a premissa "Whisper small serve no Intel" caiu no benchmark.
+## Inherited lessons (wallet-service, e-pix)
+- PRs of 1,200 to 2,500 lines in wallet-service and of ~400 in e-pix: hence the ~200 ceiling.
+- Full builds at every step cost time: targeted runs between milestones.
+- A library's main branch is not its release: confirm the behavior in the pinned version, published ≥ 2 weeks ago.
+- A tool prerequisite is not guaranteed (the Command Line Tools once came broken): check in Phase 0 and ask before installing.
+- A number goes into CLAUDE.md only after it is measured: the premise "Whisper small works on Intel" fell in the benchmark.

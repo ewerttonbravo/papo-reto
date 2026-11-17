@@ -1,78 +1,78 @@
 # Papo Reto — CLAUDE.md
 
-## Produto
-Ditado por voz para macOS, focado em PT-BR, 100% local e open-source (MIT). Segura `Fn`, fala, solta: o texto aparece no cursor. Alternativa gratuita ao Wispr Flow, inspirada no [Arara](https://github.com/davimatosms/Arara-voice), mas nativa e leve.
+## Product
+Voice dictation for macOS, focused on PT-BR, 100% local and open source (MIT). Hold `Fn`, speak, release: the text appears at the cursor. A free alternative to Wispr Flow, inspired by [Arara](https://github.com/davimatosms/Arara-voice), but native and lightweight.
 
-MVP: menu bar (sem Dock nem janela), ícone por estado (carregando / pronto / gravando / transcrevendo), menu com microfones e "Sair". Fora de escopo sem pedido explícito: Windows/Linux, nuvem, troca de modelo, histórico, dicionário, temas, preview ao vivo, auto-update, onboarding, atalho configurável.
+MVP: menu bar (no Dock, no window), icon per state (loading / ready / recording / transcribing), menu with microphones and "Quit". Out of scope without an explicit request: Windows/Linux, cloud, model switching, history, dictionary, themes, live preview, auto-update, onboarding, configurable shortcut.
 
-## Princípios
-1. **Brutalmente simples.** Feature nova precisa justificar a existência. Na dúvida, não entra.
-2. **Leve onde dá.** O modelo fica residente (ADR-003); fora isso, ~0% de CPU ocioso, sem timer de polling, microfone desligado fora da gravação.
-3. **Local.** Áudio e texto nunca saem da máquina; a única rede é o download do modelo (ADR-002).
-4. **Configuração mínima.** O único ajuste é o microfone.
-5. **Intel primeiro.** Mac de referência: i5-1038NG7 (4 núcleos, AVX-512, 16 GB, macOS 26). Medir nele antes de Apple Silicon.
+## Principles
+1. **Brutally simple.** A new feature must justify its existence. When in doubt, leave it out.
+2. **Light wherever possible.** The model stays resident (ADR-003); apart from that, ~0% idle CPU, no polling timer, microphone off outside recording.
+3. **Local.** Audio and text never leave the machine; the only network use is the model download (ADR-002).
+4. **Minimal configuration.** The only setting is the microphone.
+5. **Intel first.** Reference Mac: i5-1038NG7 (4 cores, AVX-512, 16 GB, macOS 26). Measure on it before Apple Silicon.
 
-## Dois repos (ADR-007)
-- `papo-reto` (este): código, `README.md` e ferramentas do agente (`CLAUDE.md`, `.claude/`, `scripts/`). O PR de task não leva doc além do README.
-- `../papo-reto-docs`: [estado](../papo-reto-docs/estado.md), [roadmap de tasks](../papo-reto-docs/roadmap.md), [ADRs e trade-offs](../papo-reto-docs/README.md), planos de task (`tasks/NN-nome.md`), `notes/linkedin/` (fora do git). Push direto na `main`.
-- Ler `../papo-reto-docs/estado.md` no início de cada sessão.
+## Two repos (ADR-007)
+- `papo-reto` (this one): code, `README.md` and agent tooling (`CLAUDE.md`, `.claude/`, `scripts/`). A task PR carries no docs besides the README.
+- `../papo-reto-docs`: [state](../papo-reto-docs/estado.md), [task roadmap](../papo-reto-docs/roadmap.md), [ADRs and trade-offs](../papo-reto-docs/README.md), task plans (`tasks/NN-name.md`), `notes/linkedin/` (outside git). Push straight to `main`.
+- Read `../papo-reto-docs/estado.md` at the start of every session.
 
-## Curadoria da memória
-- ADR novo em `../papo-reto-docs/decisions/` quando houver escolha entre ≥ 2 alternativas reais, algo testado e descartado, ou decisão do Mr. Bravo que restringe escopo ou rumo. Formato: Status/data · Contexto · Decisão · Alternativas descartadas · Custo aceito · Consequências · Evidência. ≤ ~30 linhas.
-- ADR é imutável: mudar uma decisão = ADR novo "substitui ADR-00X", e o antigo vira "substituído". Atualizar o índice e a tabela de trade-offs em `../papo-reto-docs/README.md`.
-- Todo custo aceito vira uma linha na tabela de trade-offs (tipo Design ou Restrição, porquê, caminho futuro).
-- `estado.md` é sobrescrito ao fim de cada bloco de trabalho; nunca vira log.
-- Ao fechar cada task ou sessão relevante: nota em `../papo-reto-docs/notes/linkedin/NN-nome.md` no formato do README de lá, com só fatos verificados.
-- Memory guarda só preferência de colaboração; fato do projeto vai para os repos. Commit a cada marco, com o porquê.
-- Avisar em 1 linha ao registrar ("Registrei ADR-009: ..."). Este arquivo ≤ 110 linhas; o excesso desce para `../papo-reto-docs`.
-- Automático via `.claude/hooks/curadoria.sh`: injeta o estado no início da sessão e força a checagem ao fim de turno com mudanças não commitadas (no máximo 1x a cada 30 min).
+## Memory curation
+- New ADR in `../papo-reto-docs/decisions/` when there is a choice between ≥ 2 real alternatives, something tested and discarded, or a decision by Mr. Bravo that restricts scope or direction. Format: Status/date · Context · Decision · Discarded alternatives · Accepted cost · Consequences · Evidence. ≤ ~30 lines.
+- An ADR is immutable: changing a decision = new ADR "supersedes ADR-00X", and the old one becomes "superseded". Update the index and the trade-off table in `../papo-reto-docs/README.md`.
+- Every accepted cost becomes a row in the trade-off table (type Design or Constraint, why, future path).
+- `estado.md` is overwritten at the end of each block of work; it never becomes a log.
+- When closing each task or relevant session: note in `../papo-reto-docs/notes/linkedin/NN-name.md` in the format of the README there, with verified facts only.
+- Memory keeps only collaboration preferences; project facts go to the repos. Commit at each milestone, with the why.
+- Say it in 1 line when recording ("Recorded ADR-009: ..."). This file ≤ 110 lines; the excess moves down to `../papo-reto-docs`.
+- Automatic via `.claude/hooks/curadoria.sh`: injects the state at session start and forces the check at the end of a turn with uncommitted changes (at most once every 30 min).
 
 ## Stack
-Swift 6 · AppKit · SwiftPM (sem Xcode project, sem SwiftUI, sem dependências Swift de terceiros) · Swift Testing · sherpa-onnx (C API, libs pré-compiladas fixadas por SHA-256) · Parakeet TDT 0.6B v3 int8 (ADR-003) · macOS 13+ · release por arquitetura (ADR-006).
+Swift 6 · AppKit · SwiftPM (no Xcode project, no SwiftUI, no third-party Swift dependencies) · Swift Testing · sherpa-onnx (C API, prebuilt libs pinned by SHA-256) · Parakeet TDT 0.6B v3 int8 (ADR-003) · macOS 13+ · per-architecture release (ADR-006).
 
-## Arquitetura
-| Target | Conteúdo | Pode importar |
+## Architecture
+| Target | Contents | May import |
 |---|---|---|
-| `PapoRetoCore` | Lógica pura: máquina de estados, gesto do `Fn` (relógio injetado), descarte de silêncio, verificação de SHA-256, texto final, portas (protocolos) | só Foundation |
-| `PapoReto` | App + adapters finos: `StatusMenu`, `FnKeyMonitor` (CGEventTap), `AudioRecorder` (AVAudioEngine), `AudioDevices` (Core Audio), `Transcriber` (sherpa), `ModelStore` (download), `Paster` | qualquer coisa + Core |
-| `CSherpaOnnx` | module map para `c-api.h` | — |
+| `PapoRetoCore` | Pure logic: state machine, `Fn` gesture (injected clock), silence discarding, SHA-256 verification, final text, ports (protocols) | Foundation only |
+| `PapoReto` | App + thin adapters: `StatusMenu`, `FnKeyMonitor` (CGEventTap), `AudioRecorder` (AVAudioEngine), `AudioDevices` (Core Audio), `Transcriber` (sherpa), `ModelStore` (download), `Paster` | anything + Core |
+| `CSherpaOnnx` | module map for `c-api.h` | — |
 
-O compilador impede o Core de importar o app. Todas as transições de estado passam pela máquina de estados do Core; adapter nenhum muda estado por conta própria.
+The compiler prevents the Core from importing the app. Every state transition goes through the Core state machine; no adapter changes state on its own.
 
-## Armadilhas conhecidas
-- **Modelo:** carrega uma vez em background ao abrir o app; reusar o `OfflineRecognizer` e criar um stream por transcrição; `num_threads` = `hw.physicalcpu`. Um `Fn` antes do load terminar grava normalmente e transcreve quando o modelo fica pronto.
-- **Áudio:** o engine só roda durante a gravação. O microfone é escolhido com `kAudioOutputUnitProperty_CurrentDevice` e persistido pelo UID, caindo no padrão se o dispositivo sumir. Converter para 16 kHz mono Float32 em memória, nunca em disco. Medir o mãos-livres com 2 min de fala antes de decidir por VAD.
-- **Fn:** CGEventTap em `flagsChanged` + `keyDown` (`.maskSecondaryFn`). Gravar já no keydown e descartar se for toque curto. Fn+tecla cancela. Reativar após `tapDisabledByTimeout`. Orientar o usuário: "Pressionar tecla 🌐 para" → "Não fazer nada".
-- **Colar:** salvar o pasteboard inteiro, escrever com `org.nspasteboard.TransientType`, enviar Cmd+V via CGEvent e restaurar em ~250 ms.
-- **Permissões:** o TCC amarra a permissão à assinatura. Ad-hoc reseta a cada build, então o dev usa o certificado autoassinado "Papo Reto Dev" (ADR-006).
-- **Idioma:** o v3 detecta o idioma sozinho e foi treinado com mais português europeu; vigiar frase curta saindo em espanhol.
+## Known pitfalls
+- **Model:** loads once in the background when the app opens; reuse the `OfflineRecognizer` and create one stream per transcription; `num_threads` = `hw.physicalcpu`. An `Fn` press before the load finishes records normally and transcribes when the model is ready.
+- **Audio:** the engine runs only while recording. The microphone is selected with `kAudioOutputUnitProperty_CurrentDevice` and persisted by UID, falling back to the default if the device disappears. Convert to 16 kHz mono Float32 in memory, never on disk. Measure hands-free with 2 min of speech before deciding on VAD.
+- **Fn:** CGEventTap on `flagsChanged` + `keyDown` (`.maskSecondaryFn`). Start recording on keydown and discard if it was a short tap. Fn+key cancels. Re-enable after `tapDisabledByTimeout`. Tell the user: "Press 🌐 key to" ("Pressionar tecla 🌐 para") → "Do Nothing" ("Não fazer nada").
+- **Paste:** save the whole pasteboard, write with `org.nspasteboard.TransientType`, send Cmd+V via CGEvent and restore after ~250 ms.
+- **Permissions:** TCC ties the permission to the signature. Ad-hoc resets on every build, so development uses the self-signed certificate "Papo Reto Dev" (ADR-006).
+- **Language:** v3 detects the language on its own and was trained with more European Portuguese; watch for short phrases coming out in Spanish.
 
-## Orçamento de performance (medir no Mac de referência)
-| Métrica | Alvo |
+## Performance budget (measure on the reference Mac)
+| Metric | Target |
 |---|---|
-| RAM residente com o modelo, ocioso | < 800 MB (provisório; a T01 fixa o número nativo) |
-| CPU ociosa | ~0% |
-| Soltar `Fn` → texto colado, 10 s de fala | < 1,5 s (sherpa medido: 0,8 s) |
-| Load do modelo na abertura | < 5 s, em background, sem travar a menu bar |
-| `.app` por arquitetura, sem modelo | < 45 MB |
+| Resident RAM with the model, idle | < 800 MB (provisional; T01 sets the native number) |
+| Idle CPU | ~0% |
+| Release `Fn` → text pasted, 10 s of speech | < 1.5 s (sherpa measured: 0.8 s) |
+| Model load at launch | < 5 s, in the background, without freezing the menu bar |
+| `.app` per architecture, without the model | < 45 MB |
 
-## Processo (ADR-008)
-- **Tasks**: roadmap em `../papo-reto-docs/roadmap.md`; cada task roda pelo skill `/task NN` (elucidar → TDD → PR). 1 comportamento observável, diff ≤ ~200 linhas com testes.
-- **TDD**: red → green → refactor, um ciclo por comportamento, teste sempre primeiro.
-- **KISS/DRY**: a solução mínima que passa no teste; abstração só no 2º uso real.
-- Testes do Core: Swift Testing, unitários puros, fakes em memória, nome do teste = regra (`fnHeldOver300msStartsPushToTalk`). Sem sleep: relógio injetado.
-- Adapters: sem teste de wiring. Validação por checklist manual no plano da task e por `make bench`.
+## Process (ADR-008)
+- **Tasks**: roadmap in `../papo-reto-docs/roadmap.md`; each task runs through the `/task NN` skill (elucidate → TDD → PR). 1 observable behavior, diff ≤ ~200 lines with tests.
+- **TDD**: red → green → refactor, one cycle per behavior, test always first.
+- **KISS/DRY**: the minimal solution that passes the test; abstraction only on the 2nd real use.
+- Core tests: Swift Testing, pure unit tests, in-memory fakes, test name = rule (`fnHeldOver300msStartsPushToTalk`). No sleep: injected clock.
+- Adapters: no wiring tests. Validation by the manual checklist in the task plan and by `make bench`.
 
 ## Gates
-- `make test`: `swift test` + 100% de cobertura de linha no `PapoRetoCore` (llvm-cov), quebrando o build abaixo disso.
-- `make bench` (task que mexe em áudio ou modelo): texto, latência e RAM dos WAVs de referência contra o orçamento.
+- `make test`: `swift test` + 100% line coverage on `PapoRetoCore` (llvm-cov), failing the build below that.
+- `make bench` (task that touches audio or the model): text, latency and RAM of the reference WAVs against the budget.
 - CI (GitHub Actions, macOS): `make test`.
 
-## Comandos
-`make test` · `make test FILTER=<Teste>` (um teste, sem cobertura; nas CLT o `swift test` puro não acha o Swift Testing) · `make app` (monta e assina o `.app`) · `make run`. A criar: `make bench` (T01), `make install` (T09), `make release` (T10).
+## Commands
+`make test` · `make test FILTER=<Test>` (one test, no coverage; with the CLT, plain `swift test` cannot find Swift Testing) · `make app` (assembles and signs the `.app`) · `make run`. To be created: `make bench` (T01), `make install` (T09), `make release` (T10).
 
-## Convenções
-- Código e nomes em inglês; UI, README, commits e docs em PT-BR.
-- `os.Logger` com subsistema `papo-reto`; nunca logar o texto transcrito.
-- Dependência nova só com discussão: cada uma custa RAM, tamanho e superfície de quebra.
-- Mudança que afeta o orçamento traz a medição antes/depois no PR.
+## Conventions
+- Everything in this repo is in English: code, names, comments, UI, README, commits and PRs. `../papo-reto-docs` stays in PT-BR.
+- `os.Logger` with subsystem `papo-reto`; never log the transcribed text.
+- A new dependency only after discussion: each one costs RAM, size and breakage surface.
+- A change that affects the budget brings the before/after measurement in the PR.

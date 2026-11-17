@@ -26,6 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let start = ContinuousClock.now
             let transcriber = Transcriber()
             let elapsed = ContinuousClock.now - start
+            // In the app (not in the bench) ~220 MB freed by the load stay dirty in the
+            // footprint until malloc is asked to give them back: 609-692 MB → 449 MB.
+            malloc_zone_pressure_relief(nil, 0)
             if transcriber == nil {
                 log.error("model failed to load from \(Transcriber.defaultModelDir.path, privacy: .public)")
             } else {

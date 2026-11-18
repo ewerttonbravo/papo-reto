@@ -1,4 +1,6 @@
 public enum AppEvent: Sendable, Equatable {
+    /// Esc, or any key while Fn is held (ADR-005).
+    case cancelled
     case modelLoaded, modelFailed, recordingLimitReached
     /// nil on the first press since launch.
     case fnPressed(sinceRelease: Duration?)
@@ -70,6 +72,9 @@ public struct AppState: Sendable, Equatable {
             return stoppingToTranscribe(alertingLimit: false)
         case (.fnPressed, _, .handsFree):
             return stoppingToTranscribe(alertingLimit: false)
+        case (.cancelled, _, .recording), (.cancelled, _, .handsFree):
+            next.activity = .idle
+            return (next, [.discardRecording])
         case (.recordingLimitReached, _, .recording), (.recordingLimitReached, _, .handsFree):
             return stoppingToTranscribe(alertingLimit: true)
         case (.transcribed(let footprintMB), _, .transcribing):

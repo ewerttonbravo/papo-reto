@@ -1,6 +1,6 @@
 public enum AppEvent: Sendable, Equatable {
-    /// Esc, or any key while Fn is held (ADR-005).
-    case cancelled
+    /// Any key down. Recording means Fn is held, so any key cancels; hands-free only Esc (ADR-005).
+    case keyPressed(isEscape: Bool)
     case modelLoaded, modelFailed, recordingLimitReached
     /// nil on the first press since launch.
     case fnPressed(sinceRelease: Duration?)
@@ -75,7 +75,7 @@ public struct AppState: Sendable, Equatable {
         // A tap then a hold to talk: the hold's release ends it like push-to-talk.
         case (.fnReleased(let held), _, .handsFree) where held > Self.holdThreshold:
             return stoppingToTranscribe(alertingLimit: false)
-        case (.cancelled, _, .recording), (.cancelled, _, .handsFree):
+        case (.keyPressed, _, .recording), (.keyPressed(isEscape: true), _, .handsFree):
             next.activity = .idle
             return (next, [.discardRecording])
         case (.recordingLimitReached, _, .recording), (.recordingLimitReached, _, .handsFree):

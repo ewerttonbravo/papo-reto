@@ -8,3 +8,7 @@ import PapoRetoCore
 @Test func savedMicrophoneThatDisappearedFallsBackToDefault() {
     #expect(microphoneInUse(saved: "headset", connected: ["built-in"]) == nil)
 }
+
+@Test func noSavedMicrophoneFollowsTheDefault() {
+    #expect(microphoneInUse(saved: nil, connected: ["built-in", "headset"]) == nil)
+}

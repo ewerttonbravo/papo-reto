@@ -4,6 +4,8 @@ import PapoRetoCore
 private let ready = AppState(model: .ready)
 private let recording = AppState(model: .ready, activity: .recording)
 private let transcribing = AppState(model: .ready, activity: .transcribing)
+private let handsFree = AppState(model: .ready, activity: .handsFree)
+private let afterTap = AppState(model: .ready, afterTap: true)
 
 @Test func everyStateHasADistinctIcon() {
     let shown = [AppState(), ready, AppState(model: .unavailable), recording, transcribing]
@@ -30,7 +32,7 @@ private let transcribing = AppState(model: .ready, activity: .transcribing)
 }
 
 @Test func fnPressedWhenReadyStartsRecording() {
-    let (state, effects) = ready.handling(.fnPressed)
+    let (state, effects) = ready.handling(.fnPressed(sinceRelease: nil))
     #expect(state == recording)
     #expect(effects == [.startRecording])
 }
@@ -44,8 +46,33 @@ private let transcribing = AppState(model: .ready, activity: .transcribing)
 @Test(arguments: [299, 300])
 func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     let (state, effects) = recording.handling(.fnReleased(heldFor: .milliseconds(ms)))
-    #expect(state == ready)
+    #expect(state == afterTap)
     #expect(effects == [.discardRecording])
+}
+
+@Test func fnPressedUnder400msAfterATapStartsHandsFree() {
+    let (state, effects) = afterTap.handling(.fnPressed(sinceRelease: .milliseconds(399)))
+    #expect(state == handsFree)
+    #expect(state.iconName == recording.iconName)
+    #expect(effects == [.startRecording])
+}
+
+@Test func fnPressedFrom400msAfterATapStartsPushToTalk() {
+    let (state, effects) = afterTap.handling(.fnPressed(sinceRelease: .milliseconds(400)))
+    #expect(state == recording)
+    #expect(effects == [.startRecording])
+}
+
+@Test func quickPressWithoutATapStartsPushToTalk() {
+    let (state, effects) = ready.handling(.fnPressed(sinceRelease: .milliseconds(100)))
+    #expect(state == recording)
+    #expect(effects == [.startRecording])
+}
+
+@Test func fnReleasedInHandsFreeKeepsRecording() {
+    let (state, effects) = handsFree.handling(.fnReleased(heldFor: .milliseconds(100)))
+    #expect(state == handsFree)
+    #expect(effects.isEmpty)
 }
 
 @Test func transcribedWithFootprintUnder900MBKeepsTheModel() {
@@ -62,7 +89,7 @@ func transcribedWithFootprintFrom900MBReloadsTheModel(footprintMB: Double) {
 }
 
 @Test func fnPressedWhileLoadingStartsRecording() {
-    let (state, effects) = AppState().handling(.fnPressed)
+    let (state, effects) = AppState().handling(.fnPressed(sinceRelease: nil))
     #expect(state == AppState(model: .loading, activity: .recording))
     #expect(state.iconName == recording.iconName)
     #expect(effects == [.startRecording])
@@ -90,7 +117,7 @@ func modelFailedWithPendingAudioDiscardsIt(activity: AppState.Activity) {
 
 @Test(arguments: [AppState(model: .unavailable), transcribing])
 func fnIgnoredWhenModelUnavailableOrTranscribing(state: AppState) {
-    let (next, effects) = state.handling(.fnPressed)
+    let (next, effects) = state.handling(.fnPressed(sinceRelease: nil))
     #expect(next == state)
     #expect(effects.isEmpty)
 }

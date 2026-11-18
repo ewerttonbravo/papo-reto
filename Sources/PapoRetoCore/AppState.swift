@@ -1,11 +1,12 @@
 public enum AppEvent: Sendable, Equatable {
-    case modelLoaded, modelFailed, fnPressed, transcribed
+    case modelLoaded, modelFailed, fnPressed, recordingLimitReached
     case fnReleased(heldFor: Duration)
+    case transcribed(footprintMB: Double)
 }
 
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
-    case startRecording, stopRecording, discardRecording, transcribe
+    case startRecording, stopRecording, discardRecording, transcribe, reloadModel, alertRecordingLimit
 }
 
 public struct AppState: Sendable, Equatable {
@@ -14,6 +15,10 @@ public struct AppState: Sendable, Equatable {
 
     /// Holding Fn longer than this is push-to-talk (ADR-005); shorter is a tap.
     public static let holdThreshold = Duration.milliseconds(300)
+    /// The recognizer keeps the RAM of the longest audio it saw (app: 28.5 s → 1,005 MB); at the budget it is recreated.
+    public static let reloadAtFootprintMB = BenchBudget.reference.maxFootprintMB
+    /// A recording stops by itself here and is transcribed whole, which bounds the RAM peak.
+    public static let recordingLimit = Duration.seconds(120)
 
     public var model: Model
     public var activity: Activity
@@ -52,13 +57,23 @@ public struct AppState: Sendable, Equatable {
                 next.activity = .idle
                 return (next, [.discardRecording])
             }
-            next.activity = .transcribing
-            return (next, model == .ready ? [.stopRecording, .transcribe] : [.stopRecording])
-        case (.transcribed, _, .transcribing):
+            return stoppingToTranscribe(alertingLimit: false)
+        case (.recordingLimitReached, _, .recording):
+            return stoppingToTranscribe(alertingLimit: true)
+        case (.transcribed(let footprintMB), _, .transcribing):
             next.activity = .idle
-            return (next, [])
+            guard footprintMB >= Self.reloadAtFootprintMB else { return (next, []) }
+            next.model = .loading
+            return (next, [.reloadModel])
         default:
             return (self, [])
         }
+    }
+
+    /// Without the model the audio waits; `.modelLoaded` transcribes it.
+    private func stoppingToTranscribe(alertingLimit: Bool) -> (state: AppState, effects: [AppEffect]) {
+        var next = self
+        next.activity = .transcribing
+        return (next, [.stopRecording] + (alertingLimit ? [.alertRecordingLimit] : []) + (model == .ready ? [.transcribe] : []))
     }
 }

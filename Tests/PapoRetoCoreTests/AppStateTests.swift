@@ -48,10 +48,17 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.discardRecording])
 }
 
-@Test func transcribedGoesBackToIdle() {
-    let (state, effects) = transcribing.handling(.transcribed)
+@Test func transcribedWithFootprintUnder900MBKeepsTheModel() {
+    let (state, effects) = transcribing.handling(.transcribed(footprintMB: 899.9))
     #expect(state == ready)
     #expect(effects.isEmpty)
+}
+
+@Test(arguments: [900, 1005])
+func transcribedWithFootprintFrom900MBReloadsTheModel(footprintMB: Double) {
+    let (state, effects) = transcribing.handling(.transcribed(footprintMB: footprintMB))
+    #expect(state == AppState(model: .loading))
+    #expect(effects == [.reloadModel])
 }
 
 @Test func fnPressedWhileLoadingStartsRecording() {
@@ -85,5 +92,30 @@ func modelFailedWithPendingAudioDiscardsIt(activity: AppState.Activity) {
 func fnIgnoredWhenModelUnavailableOrTranscribing(state: AppState) {
     let (next, effects) = state.handling(.fnPressed)
     #expect(next == state)
+    #expect(effects.isEmpty)
+}
+
+@Test func recordingLimitStopsTranscribesAndAlerts() {
+    let (state, effects) = recording.handling(.recordingLimitReached)
+    #expect(state == transcribing)
+    #expect(effects == [.stopRecording, .alertRecordingLimit, .transcribe])
+}
+
+@Test func recordingLimitWhileLoadingWaitsForTheModel() {
+    let (state, effects) = AppState(model: .loading, activity: .recording).handling(.recordingLimitReached)
+    #expect(state == AppState(model: .loading, activity: .transcribing))
+    #expect(effects == [.stopRecording, .alertRecordingLimit])
+}
+
+@Test(arguments: [ready, transcribing])
+func recordingLimitOutsideRecordingIsIgnored(state: AppState) {
+    let (next, effects) = state.handling(.recordingLimitReached)
+    #expect(next == state)
+    #expect(effects.isEmpty)
+}
+
+@Test func fnReleasedAfterTheLimitIsIgnored() {
+    let (state, effects) = transcribing.handling(.fnReleased(heldFor: .seconds(125)))
+    #expect(state == transcribing)
     #expect(effects.isEmpty)
 }

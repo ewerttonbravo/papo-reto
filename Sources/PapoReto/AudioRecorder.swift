@@ -19,10 +19,10 @@ final class AudioRecorder: @unchecked Sendable {
         let engine = AVAudioEngine()
         let input = engine.inputNode
         // The device must be set before reading the format, which comes from it.
+        var chosen = device
         if let device, !select(device, on: input) {
-            log.error("could not select \(device.name, privacy: .public), recording from the system default")
-        } else {
-            log.info("recording from \(device?.name ?? "the system default", privacy: .public)")
+            log.error("could not select \(device.name, privacy: .private(mask: .hash)), recording from the system default")
+            chosen = nil
         }
         let inputFormat = input.outputFormat(forBus: 0)
         guard let converter = AVAudioConverter(from: inputFormat, to: format) else {
@@ -36,6 +36,12 @@ final class AudioRecorder: @unchecked Sendable {
         do {
             try engine.start()
             self.engine = engine
+            // Device names often carry the owner's name: hashed, still telling devices apart.
+            if let chosen {
+                log.info("recording from \(chosen.name, privacy: .private(mask: .hash))")
+            } else {
+                log.info("recording from the system default")
+            }
         } catch {
             input.removeTap(onBus: 0)
             log.error("microphone did not start: \(error, privacy: .public)")

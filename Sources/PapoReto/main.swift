@@ -73,9 +73,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func perform(_ effect: AppEffect) {
         switch effect {
         case .startRecording:
-            let devices = AudioDevices.inputs()
-            let uid = microphoneInUse(saved: savedMicrophone, connected: devices.map(\.uid))
-            recorder.start(from: devices.first { $0.uid == uid })
+            // Nothing saved means the default: skip asking Core Audio on every Fn press.
+            recorder.start(from: savedMicrophone == nil ? nil : currentMicrophone(among: AudioDevices.inputs()))
         case .stopRecording: pendingSamples = recorder.stop()
         case .discardRecording: _ = recorder.stop(); pendingSamples = []
         case .transcribe: transcribe()
@@ -111,10 +110,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var savedMicrophone: String? { UserDefaults.standard.string(forKey: Self.microphoneKey) }
 
+    /// The saved microphone while it is connected; nil records from the system default.
+    private func currentMicrophone(among devices: [InputDevice]) -> InputDevice? {
+        let uid = microphoneInUse(saved: savedMicrophone, connected: devices.map(\.uid))
+        return devices.first { $0.uid == uid }
+    }
+
     /// Rebuilt on each opening, so a device plugged in meanwhile shows up without polling.
     func menuNeedsUpdate(_ menu: NSMenu) {
         let devices = AudioDevices.inputs()
-        let inUse = microphoneInUse(saved: savedMicrophone, connected: devices.map(\.uid))
+        let inUse = currentMicrophone(among: devices)?.uid
         menu.removeAllItems()
         let entries: [(title: String, uid: String?)] = [("System Default", nil)] + devices.map { ($0.name, $0.uid) }
         for entry in entries {

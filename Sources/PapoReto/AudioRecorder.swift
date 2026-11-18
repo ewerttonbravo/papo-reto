@@ -3,7 +3,7 @@ import os
 
 private let log = Logger(subsystem: "papo-reto", category: "audio")
 
-/// Default microphone as 16 kHz mono Float32, in memory. The engine runs only while recording.
+/// The chosen microphone (or the system default) as 16 kHz mono Float32, in memory. The engine runs only while recording.
 /// `@unchecked Sendable`: the tap runs on an audio thread and only touches `samples` under the lock.
 final class AudioRecorder: @unchecked Sendable {
     private let format = AVAudioFormat(
@@ -12,11 +12,18 @@ final class AudioRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var samples: [Float] = []
 
-    func start() {
-        // A new engine per recording follows the current default input and its format;
+    /// `nil` records from the system default.
+    func start(from device: InputDevice?) {
+        // A new engine per recording follows the current device and its format;
         // a reused one can keep a stale format after a device change and crash in installTap.
         let engine = AVAudioEngine()
         let input = engine.inputNode
+        // The device must be set before reading the format, which comes from it.
+        var chosen = device
+        if let device, !select(device, on: input) {
+            log.error("could not select \(device.name, privacy: .private(mask: .hash)), recording from the system default")
+            chosen = nil
+        }
         let inputFormat = input.outputFormat(forBus: 0)
         guard let converter = AVAudioConverter(from: inputFormat, to: format) else {
             log.error("no converter from the input format \(inputFormat, privacy: .public)")
@@ -29,6 +36,12 @@ final class AudioRecorder: @unchecked Sendable {
         do {
             try engine.start()
             self.engine = engine
+            // Device names often carry the owner's name: hashed, still telling devices apart.
+            if let chosen {
+                log.info("recording from \(chosen.name, privacy: .private(mask: .hash))")
+            } else {
+                log.info("recording from the system default")
+            }
         } catch {
             input.removeTap(onBus: 0)
             log.error("microphone did not start: \(error, privacy: .public)")
@@ -44,6 +57,14 @@ final class AudioRecorder: @unchecked Sendable {
             defer { samples = [] }
             return samples
         }
+    }
+
+    private func select(_ device: InputDevice, on input: AVAudioInputNode) -> Bool {
+        guard let unit = input.audioUnit else { return false }
+        var id = device.id
+        return AudioUnitSetProperty(
+            unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+            &id, UInt32(MemoryLayout<AudioDeviceID>.size)) == noErr
     }
 
     private func append(converting buffer: AVAudioPCMBuffer, with converter: AVAudioConverter) {

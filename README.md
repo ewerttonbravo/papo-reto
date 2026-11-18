@@ -2,7 +2,7 @@
 
 Voice dictation for macOS, focused on Brazilian Portuguese (PT-BR), 100% local. Hold `Fn`, speak, release: the text appears at the cursor.
 
-In development: holding `Fn` for more than 300 ms records the default microphone, and on release the transcribed text is pasted at the cursor with Cmd+V. Your previous clipboard comes back 250 ms later, except a password from a password manager, which is left out. Clipboard managers that honor `org.nspasteboard.TransientType` skip the dictation. With no text field in focus, the dictation is lost. A press while the model is still loading (hourglass icon) is transcribed once it is ready.
+In development: holding `Fn` for more than 300 ms records the microphone chosen in the menu bar (Microphone → System Default or a device; the choice is saved, and while that device is unplugged the system default records), and on release the transcribed text is pasted at the cursor with Cmd+V. Your previous clipboard comes back 250 ms later, except a password from a password manager, which is left out. Clipboard managers that honor `org.nspasteboard.TransientType` skip the dictation. With no text field in focus, the dictation is lost. A press while the model is still loading (hourglass icon) is transcribed once it is ready.
 
 The first launch asks for Accessibility (to read the `Fn` key and send Cmd+V; grant it and reopen the app) and, on the first dictation, for the Microphone. Set System Settings → Keyboard → "Press 🌐 key to" → "Do Nothing", or macOS also acts on `Fn`.
 

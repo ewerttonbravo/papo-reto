@@ -6,13 +6,14 @@ private let log = Logger(subsystem: "papo-reto", category: "fn")
 /// Fn press and release from a listen-only event tap on flagsChanged. Needs Accessibility.
 @MainActor
 final class FnKeyMonitor {
-    private let onPress: () -> Void
+    private let onPress: (Duration?) -> Void
     private let onRelease: (Duration) -> Void
     private var tap: CFMachPort?
     private var pressedAt: ContinuousClock.Instant?
+    private var releasedAt: ContinuousClock.Instant?
 
     /// Nil without Accessibility; the system prompt asks for it once.
-    init?(onPress: @escaping () -> Void, onRelease: @escaping (Duration) -> Void) {
+    init?(onPress: @escaping (Duration?) -> Void, onRelease: @escaping (Duration) -> Void) {
         // The value of kAXTrustedCheckOptionPrompt, a global var that Swift 6 rejects as shared state.
         let prompt = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         guard AXIsProcessTrustedWithOptions(prompt) else { return nil }
@@ -50,9 +51,10 @@ final class FnKeyMonitor {
         switch (fnDown, pressedAt) {
         case (true, nil):
             pressedAt = .now
-            onPress()
+            onPress(releasedAt.map { .now - $0 })
         case (false, let start?):
             pressedAt = nil
+            releasedAt = .now
             onRelease(.now - start)
         default:
             break

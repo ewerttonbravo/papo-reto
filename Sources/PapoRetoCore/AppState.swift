@@ -1,5 +1,7 @@
 public enum AppEvent: Sendable, Equatable {
-    case modelLoaded, modelFailed, fnPressed, recordingLimitReached
+    case modelLoaded, modelFailed, recordingLimitReached
+    /// nil on the first press since launch.
+    case fnPressed(sinceRelease: Duration?)
     case fnReleased(heldFor: Duration)
     case transcribed(footprintMB: Double)
 }
@@ -11,10 +13,12 @@ public enum AppEffect: Sendable, Equatable {
 
 public struct AppState: Sendable, Equatable {
     public enum Model: Sendable { case loading, ready, unavailable }
-    public enum Activity: Sendable { case idle, recording, transcribing }
+    public enum Activity: Sendable { case idle, recording, handsFree, transcribing }
 
     /// Holding Fn longer than this is push-to-talk (ADR-005); shorter is a tap.
     public static let holdThreshold = Duration.milliseconds(300)
+    /// A press this soon after a tap's release is a double tap: hands-free (ADR-005).
+    public static let doubleTapWindow = Duration.milliseconds(400)
     /// The recognizer keeps the RAM of the longest audio it saw (app: 28.5 s → 1,005 MB); at the budget it is recreated.
     public static let reloadAtFootprintMB = BenchBudget.reference.maxFootprintMB
     /// A recording stops by itself here and is transcribed whole, which bounds the RAM peak.
@@ -22,16 +26,19 @@ public struct AppState: Sendable, Equatable {
 
     public var model: Model
     public var activity: Activity
+    /// The last Fn release was a tap; the next press consumes it.
+    public var afterTap: Bool
 
-    public init(model: Model = .loading, activity: Activity = .idle) {
+    public init(model: Model = .loading, activity: Activity = .idle, afterTap: Bool = false) {
         self.model = model
         self.activity = activity
+        self.afterTap = afterTap
     }
 
     /// SF Symbol shown in the menu bar.
     public var iconName: String {
         switch (activity, model) {
-        case (.recording, _): "mic.fill"
+        case (.recording, _), (.handsFree, _): "mic.fill"
         case (.transcribing, _): "ellipsis.bubble"
         case (.idle, .loading): "hourglass"
         case (.idle, .ready): "mic"
@@ -49,12 +56,15 @@ public struct AppState: Sendable, Equatable {
             next.model = .unavailable
             next.activity = .idle
             return (next, activity == .idle ? [] : [.discardRecording])
-        case (.fnPressed, .loading, .idle), (.fnPressed, .ready, .idle):
-            next.activity = .recording
+        case (.fnPressed(let sinceRelease), .loading, .idle), (.fnPressed(let sinceRelease), .ready, .idle):
+            let doubleTap = afterTap && sinceRelease.map { $0 < Self.doubleTapWindow } == true
+            next.activity = doubleTap ? .handsFree : .recording
+            next.afterTap = false
             return (next, [.startRecording])
         case (.fnReleased(let held), _, .recording):
             guard held > Self.holdThreshold else {
                 next.activity = .idle
+                next.afterTap = true
                 return (next, [.discardRecording])
             }
             return stoppingToTranscribe(alertingLimit: false)

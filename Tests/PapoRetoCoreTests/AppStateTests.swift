@@ -159,3 +159,17 @@ func recordingLimitOutsideRecordingIsIgnored(state: AppState) {
     #expect(state == transcribing)
     #expect(effects.isEmpty)
 }
+
+@Test(arguments: [recording, handsFree, AppState(model: .loading, activity: .handsFree)])
+func cancelledWhileRecordingDiscards(state: AppState) {
+    let (next, effects) = state.handling(.cancelled)
+    #expect(next == AppState(model: state.model))
+    #expect(effects == [.discardRecording])
+}
+
+@Test(arguments: [ready, afterTap, transcribing, AppState()])
+func cancelledOutsideRecordingIsIgnored(state: AppState) {
+    let (next, effects) = state.handling(.cancelled)
+    #expect(next == state)
+    #expect(effects.isEmpty)
+}

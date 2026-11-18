@@ -55,8 +55,10 @@ app: $(SHERPA_LIB)
 	mkdir -p build/PapoReto.app/Contents/MacOS
 	cp "$$(swift build -c release --show-bin-path)/PapoReto" build/PapoReto.app/Contents/MacOS/
 	cp Resources/Info.plist build/PapoReto.app/Contents/
-	@ID=-; security find-identity -v -p codesigning | grep -qF '"$(DEV_CERT)"' && ID='$(DEV_CERT)'; \
-	echo "Signing with: $$ID"; codesign --force --sign "$$ID" build/PapoReto.app
+	@ID=$$(DEV_CERT='$(DEV_CERT)' scripts/dev-cert.sh --identity); \
+	if [ -n "$$ID" ]; then echo "Signing with \"$(DEV_CERT)\" ($$ID)"; \
+	else ID=-; echo "Signing ad-hoc: no \"$(DEV_CERT)\" identity, so TCC permissions reset (run scripts/dev-cert.sh)"; fi; \
+	codesign --force --sign "$$ID" build/PapoReto.app
 
 run: app
 	open build/PapoReto.app

@@ -8,7 +8,7 @@ private let log = Logger(subsystem: "papo-reto", category: "model")
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
-    private var state = AppState.loading
+    private var state = AppState()
     private var transcriber: Transcriber?
     private let unavailableItem = NSMenuItem(title: "Model not found. Run scripts/fetch-deps.sh model", action: nil, keyEquivalent: "")
 
@@ -43,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func modelDidLoad(_ transcriber: Transcriber?) {
         self.transcriber = transcriber
-        state = state.handling(transcriber == nil ? .modelFailed : .modelLoaded)
+        state = state.handling(transcriber == nil ? .modelFailed : .modelLoaded).state
         render()
     }
 
@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.button?.image = image
         // An unknown symbol name yields nil: show text so the menu (and "Quit") stays reachable.
         statusItem?.button?.title = image == nil ? "PR" : ""
-        unavailableItem.isHidden = state != .modelUnavailable
+        unavailableItem.isHidden = state.model != .unavailable
     }
 }
 

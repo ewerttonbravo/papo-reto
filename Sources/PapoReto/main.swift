@@ -6,7 +6,8 @@ import os
 private let log = Logger(subsystem: "papo-reto", category: "model")
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+    private static let microphoneKey = "microphoneUID"
     private var statusItem: NSStatusItem?
     private var state = AppState()
     private var transcriber: Transcriber?
@@ -14,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let recorder = AudioRecorder()
     private var pendingSamples: [Float] = []
     private let unavailableItem = NSMenuItem(title: "Model not found. Run scripts/fetch-deps.sh model", action: nil, keyEquivalent: "")
+    private let microphoneMenu = NSMenu()
     private let accessibilityItem = NSMenuItem(
         title: "Allow Accessibility in System Settings, then reopen Papo Reto", action: nil, keyEquivalent: "")
 
@@ -22,6 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.addItem(unavailableItem)
         menu.addItem(accessibilityItem)
+        let microphoneItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
+        microphoneMenu.delegate = self
+        microphoneItem.submenu = microphoneMenu
+        menu.addItem(microphoneItem)
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
@@ -65,7 +72,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func perform(_ effect: AppEffect) {
         switch effect {
-        case .startRecording: recorder.start()
+        case .startRecording:
+            let devices = AudioDevices.inputs()
+            let uid = microphoneInUse(saved: savedMicrophone, connected: devices.map(\.uid))
+            recorder.start(from: devices.first { $0.uid == uid })
         case .stopRecording: pendingSamples = recorder.stop()
         case .discardRecording: _ = recorder.stop(); pendingSamples = []
         case .transcribe: transcribe()
@@ -97,6 +107,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         handle(.transcribed)
+    }
+
+    private var savedMicrophone: String? { UserDefaults.standard.string(forKey: Self.microphoneKey) }
+
+    /// Rebuilt on each opening, so a device plugged in meanwhile shows up without polling.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        let devices = AudioDevices.inputs()
+        let inUse = microphoneInUse(saved: savedMicrophone, connected: devices.map(\.uid))
+        menu.removeAllItems()
+        let entries: [(title: String, uid: String?)] = [("System Default", nil)] + devices.map { ($0.name, $0.uid) }
+        for entry in entries {
+            let item = NSMenuItem(title: entry.title, action: #selector(chooseMicrophone(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = entry.uid
+            item.state = entry.uid == inUse ? .on : .off
+            menu.addItem(item)
+        }
+    }
+
+    @objc private func chooseMicrophone(_ sender: NSMenuItem) {
+        UserDefaults.standard.set(sender.representedObject as? String, forKey: Self.microphoneKey)
     }
 
     private func render() {

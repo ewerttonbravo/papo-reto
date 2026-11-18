@@ -57,9 +57,9 @@ public struct AppState: Sendable, Equatable {
                 next.activity = .idle
                 return (next, [.discardRecording])
             }
-            return stoppingToTranscribe(alerting: [])
+            return stoppingToTranscribe(alertingLimit: false)
         case (.recordingLimitReached, _, .recording):
-            return stoppingToTranscribe(alerting: [.alertRecordingLimit])
+            return stoppingToTranscribe(alertingLimit: true)
         case (.transcribed(let audio), _, .transcribing):
             next.activity = .idle
             guard audio > Self.reloadAfter else { return (next, []) }
@@ -71,9 +71,9 @@ public struct AppState: Sendable, Equatable {
     }
 
     /// Without the model the audio waits; `.modelLoaded` transcribes it.
-    private func stoppingToTranscribe(alerting alert: [AppEffect]) -> (state: AppState, effects: [AppEffect]) {
+    private func stoppingToTranscribe(alertingLimit: Bool) -> (state: AppState, effects: [AppEffect]) {
         var next = self
         next.activity = .transcribing
-        return (next, [.stopRecording] + alert + (model == .ready ? [.transcribe] : []))
+        return (next, [.stopRecording] + (alertingLimit ? [.alertRecordingLimit] : []) + (model == .ready ? [.transcribe] : []))
     }
 }

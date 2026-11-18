@@ -42,7 +42,7 @@ Swift 6 · AppKit · SwiftPM (no Xcode project, no SwiftUI, no third-party Swift
 The compiler prevents the Core from importing the app. Every state transition goes through the Core state machine; no adapter changes state on its own.
 
 ## Known pitfalls
-- **Model:** loads once in the background when the app opens; reuse the `OfflineRecognizer` and create one stream per transcription; `num_threads` = `hw.physicalcpu`. Files in `~/Library/Application Support/PapoReto/Models/parakeet-tdt-0.6b-v3-int8/`; libs and model come from `scripts/fetch-deps.sh` (SHA-256 pinned). An `Fn` press before the load finishes records normally and transcribes when the model is ready. After each load the app calls `malloc_zone_pressure_relief(nil, 0)` (609-692 → 450 MB); not in `Transcriber`, where it pushed the bench to 899 MB (ADR-012).
+- **Model:** loads in the background when the app opens; reuse the `OfflineRecognizer` and create one stream per transcription; after transcribing > 30 s of audio the app destroys it and loads a new one (destroy first: both at once peak at ~2.4 GB), since it keeps the RAM of the longest audio it saw; `num_threads` = `hw.physicalcpu`. Files in `~/Library/Application Support/PapoReto/Models/parakeet-tdt-0.6b-v3-int8/`; libs and model come from `scripts/fetch-deps.sh` (SHA-256 pinned). An `Fn` press before a load finishes records normally and transcribes when the model is ready. Recording stops by itself at 2 min (sound + transcribes it whole). After each load the app calls `malloc_zone_pressure_relief(nil, 0)` (609-692 → 450 MB); not in `Transcriber`, where it pushed the bench to 899 MB (ADR-012).
 - **Audio:** the engine runs only while recording. The microphone is selected with `kAudioOutputUnitProperty_CurrentDevice` and persisted by UID, falling back to the default if the device disappears. Convert to 16 kHz mono Float32 in memory, never on disk. Measure hands-free with 2 min of speech before deciding on VAD.
 - **Fn:** CGEventTap on `flagsChanged` + `keyDown` (`.maskSecondaryFn`). Start recording on keydown and discard if it was a short tap. Fn+key cancels. Re-enable after `tapDisabledByTimeout`. Tell the user: "Press 🌐 key to" ("Pressionar tecla 🌐 para") → "Do Nothing" ("Não fazer nada").
 - **Paste:** save the whole pasteboard, write with `org.nspasteboard.TransientType`, send Cmd+V via CGEvent and restore after ~250 ms.
@@ -53,7 +53,7 @@ The compiler prevents the Core from importing the app. Every state transition go
 ## Performance budget (measure on the reference Mac)
 | Metric | Target |
 |---|---|
-| Physical footprint with the model, idle after a transcription | < 900 MB (T01: 460 MB after load, 889 MB after ≤ 28 s clips; longer audio keeps it higher, 103 s → 1.9 GB, until T05b recreates the recognizer) |
+| Physical footprint with the model, idle after a transcription | < 900 MB (T01: 460 MB after load, 889 MB after ≤ 28 s clips; longer audio keeps it higher, 103 s → 1.9 GB, so the app recreates the recognizer after > 30 s) |
 | Idle CPU | ~0% |
 | Release `Fn` → text pasted, 10 s of speech | < 1.5 s (sherpa measured: 0.8 s) |
 | Model load at launch | < 5 s, in the background, without freezing the menu bar |

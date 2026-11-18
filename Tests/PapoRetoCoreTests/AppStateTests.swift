@@ -53,3 +53,37 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(state == ready)
     #expect(effects.isEmpty)
 }
+
+@Test func fnPressedWhileLoadingStartsRecording() {
+    let (state, effects) = AppState().handling(.fnPressed)
+    #expect(state == AppState(model: .loading, activity: .recording))
+    #expect(state.iconName == recording.iconName)
+    #expect(effects == [.startRecording])
+}
+
+@Test func fnReleasedWhileLoadingWaitsForTheModel() {
+    let (state, effects) = AppState(model: .loading, activity: .recording)
+        .handling(.fnReleased(heldFor: .milliseconds(301)))
+    #expect(state == AppState(model: .loading, activity: .transcribing))
+    #expect(effects == [.stopRecording])
+}
+
+@Test func modelLoadedWithPendingAudioTranscribes() {
+    let (state, effects) = AppState(model: .loading, activity: .transcribing).handling(.modelLoaded)
+    #expect(state == transcribing)
+    #expect(effects == [.transcribe])
+}
+
+@Test(arguments: [AppState.Activity.recording, .transcribing])
+func modelFailedWithPendingAudioDiscardsIt(activity: AppState.Activity) {
+    let (state, effects) = AppState(model: .loading, activity: activity).handling(.modelFailed)
+    #expect(state == AppState(model: .unavailable))
+    #expect(effects == [.discardRecording])
+}
+
+@Test(arguments: [AppState(model: .unavailable), transcribing])
+func fnIgnoredWhenModelUnavailableOrTranscribing(state: AppState) {
+    let (next, effects) = state.handling(.fnPressed)
+    #expect(next == state)
+    #expect(effects.isEmpty)
+}

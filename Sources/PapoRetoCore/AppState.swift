@@ -68,7 +68,9 @@ public struct AppState: Sendable, Equatable {
                 return (next, [.discardRecording])
             }
             return stoppingToTranscribe(alertingLimit: false)
-        case (.recordingLimitReached, _, .recording):
+        case (.fnPressed, _, .handsFree):
+            return stoppingToTranscribe(alertingLimit: false)
+        case (.recordingLimitReached, _, .recording), (.recordingLimitReached, _, .handsFree):
             return stoppingToTranscribe(alertingLimit: true)
         case (.transcribed(let footprintMB), _, .transcribing):
             next.activity = .idle

@@ -6,7 +6,7 @@ private let log = Logger(subsystem: "papo-reto", category: "audio")
 /// Default microphone as 16 kHz mono Float32, in memory. The engine runs only while recording.
 /// `@unchecked Sendable`: the tap runs on an audio thread and only touches `samples` under the lock.
 final class AudioRecorder: @unchecked Sendable {
-    private static let format = AVAudioFormat(
+    private let format = AVAudioFormat(
         commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
     private var engine: AVAudioEngine?
     private let lock = NSLock()
@@ -18,7 +18,7 @@ final class AudioRecorder: @unchecked Sendable {
         let engine = AVAudioEngine()
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
-        guard let converter = AVAudioConverter(from: inputFormat, to: Self.format) else {
+        guard let converter = AVAudioConverter(from: inputFormat, to: format) else {
             log.error("no converter from the input format \(inputFormat, privacy: .public)")
             return
         }
@@ -47,8 +47,8 @@ final class AudioRecorder: @unchecked Sendable {
     }
 
     private func append(converting buffer: AVAudioPCMBuffer, with converter: AVAudioConverter) {
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * Self.format.sampleRate / buffer.format.sampleRate) + 1
-        guard let output = AVAudioPCMBuffer(pcmFormat: Self.format, frameCapacity: capacity) else { return }
+        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * format.sampleRate / buffer.format.sampleRate) + 1
+        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return }
         // convert(to:) calls the block synchronously on this thread, so these never race.
         nonisolated(unsafe) var fed = false
         nonisolated(unsafe) let input = buffer

@@ -58,13 +58,9 @@ public struct AppState: Sendable, Equatable {
             next.model = .ready
             return (next, activity == .transcribing ? [.transcribe] : [])
         case (.modelFailed, .loading, _), (.modelFailed, .downloading, _):
-            next.model = .unavailable
-            next.activity = .idle
-            return (next, activity == .idle ? [] : [.discardRecording])
+            return droppingAudio(model: .unavailable)
         case (.downloadStarted, .loading, _):
-            next.model = .downloading
-            next.activity = .idle
-            return (next, activity == .idle ? [] : [.discardRecording])
+            return droppingAudio(model: .downloading)
         case (.fnPressed(let sinceRelease), .loading, .idle), (.fnPressed(let sinceRelease), .ready, .idle):
             let doubleTap = afterTap && sinceRelease.map { $0 < Self.doubleTapWindow } == true
             next.activity = doubleTap ? .handsFree : .recording
@@ -95,6 +91,11 @@ public struct AppState: Sendable, Equatable {
         default:
             return (self, [])
         }
+    }
+
+    /// Audio waiting for this model would wait forever (or for minutes): drop it.
+    private func droppingAudio(model: Model) -> (state: AppState, effects: [AppEffect]) {
+        (AppState(model: model), activity == .idle ? [] : [.discardRecording])
     }
 
     /// Without the model the audio waits; `.modelLoaded` transcribes it.

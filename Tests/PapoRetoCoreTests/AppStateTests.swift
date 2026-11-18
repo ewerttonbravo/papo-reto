@@ -69,6 +69,18 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.startRecording])
 }
 
+@Test func fnPressedInHandsFreeStopsAndTranscribes() {
+    let (state, effects) = handsFree.handling(.fnPressed(sinceRelease: .seconds(5)))
+    #expect(state == transcribing)
+    #expect(effects == [.stopRecording, .transcribe])
+}
+
+@Test func fnPressedInHandsFreeWhileLoadingWaitsForTheModel() {
+    let (state, effects) = AppState(model: .loading, activity: .handsFree).handling(.fnPressed(sinceRelease: .seconds(5)))
+    #expect(state == AppState(model: .loading, activity: .transcribing))
+    #expect(effects == [.stopRecording])
+}
+
 @Test func fnReleasedInHandsFreeKeepsRecording() {
     let (state, effects) = handsFree.handling(.fnReleased(heldFor: .milliseconds(100)))
     #expect(state == handsFree)
@@ -122,8 +134,9 @@ func fnIgnoredWhenModelUnavailableOrTranscribing(state: AppState) {
     #expect(effects.isEmpty)
 }
 
-@Test func recordingLimitStopsTranscribesAndAlerts() {
-    let (state, effects) = recording.handling(.recordingLimitReached)
+@Test(arguments: [recording, handsFree])
+func recordingLimitStopsTranscribesAndAlerts(state: AppState) {
+    let (state, effects) = state.handling(.recordingLimitReached)
     #expect(state == transcribing)
     #expect(effects == [.stopRecording, .alertRecordingLimit, .transcribe])
 }

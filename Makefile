@@ -45,6 +45,9 @@ bench: $(SHERPA_LIB)
 	done; \
 	echo "== $$pass/3 runs within budget"; [ $$pass -ge 2 ]
 
+# scripts/dev-cert.sh creates it; ad-hoc otherwise, which resets the TCC permissions on every build.
+DEV_CERT ?= Papo Reto Dev
+
 .PHONY: app run
 app: $(SHERPA_LIB)
 	swift build -c release --product PapoReto
@@ -52,7 +55,10 @@ app: $(SHERPA_LIB)
 	mkdir -p build/PapoReto.app/Contents/MacOS
 	cp "$$(swift build -c release --show-bin-path)/PapoReto" build/PapoReto.app/Contents/MacOS/
 	cp Resources/Info.plist build/PapoReto.app/Contents/
-	codesign --force --sign - build/PapoReto.app
+	@ID=$$(DEV_CERT='$(DEV_CERT)' scripts/dev-cert.sh --identity); \
+	if [ -n "$$ID" ]; then echo "Signing with \"$(DEV_CERT)\" ($$ID)"; \
+	else ID=-; echo "Signing ad-hoc: no \"$(DEV_CERT)\" identity, so TCC permissions reset (run scripts/dev-cert.sh)"; fi; \
+	codesign --force --sign "$$ID" build/PapoReto.app
 
 run: app
 	open build/PapoReto.app

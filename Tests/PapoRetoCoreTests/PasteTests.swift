@@ -12,6 +12,7 @@ private final class FakePasteboard: PasteboardPort, KeyboardPort {
     func snapshot() -> [String] { calls.append("snapshot"); return items }
     func writeTransient(_ text: String) { calls.append("write \(text)"); items = [text]; changeCount += 1 }
     func restore(_ snapshot: [String]) { calls.append("restore"); items = snapshot; changeCount += 1 }
+    func isConcealed(_ snapshot: [String]) -> Bool { snapshot.contains("password") }
     func pressCmdV() { calls.append("cmd+v") }
 }
 
@@ -35,4 +36,11 @@ private final class FakePasteboard: PasteboardPort, KeyboardPort {
     pasteboard.changeCount += 1
     pending.restore(on: pasteboard)
     #expect(pasteboard.items == ["copied by the user"])
+}
+
+@Test func restoreSkipsAConcealedClipboard() {
+    let pasteboard = FakePasteboard(["password"])
+    let pending = paste("Bom dia.", pasteboard: pasteboard, keyboard: pasteboard)
+    pending.restore(on: pasteboard)
+    #expect(pasteboard.items == ["Bom dia."])
 }

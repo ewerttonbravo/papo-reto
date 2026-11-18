@@ -39,11 +39,12 @@ public struct AppState: Sendable, Equatable {
         switch (event, model, activity) {
         case (.modelLoaded, .loading, _):
             next.model = .ready
-            return (next, [])
+            return (next, activity == .transcribing ? [.transcribe] : [])
         case (.modelFailed, .loading, _):
             next.model = .unavailable
-            return (next, [])
-        case (.fnPressed, .ready, .idle):
+            next.activity = .idle
+            return (next, activity == .idle ? [] : [.discardRecording])
+        case (.fnPressed, .loading, .idle), (.fnPressed, .ready, .idle):
             next.activity = .recording
             return (next, [.startRecording])
         case (.fnReleased(let held), _, .recording):
@@ -52,7 +53,7 @@ public struct AppState: Sendable, Equatable {
                 return (next, [.discardRecording])
             }
             next.activity = .transcribing
-            return (next, [.stopRecording, .transcribe])
+            return (next, model == .ready ? [.stopRecording, .transcribe] : [.stopRecording])
         case (.transcribed, _, .transcribing):
             next.activity = .idle
             return (next, [])

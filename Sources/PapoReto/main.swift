@@ -34,8 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item.menu = menu
         statusItem = item
         fnMonitor = FnKeyMonitor(
-            onPress: { [weak self] in self?.handle(.fnPressed) },
-            onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) })
+            onPress: { [weak self] since in self?.handle(.fnPressed(sinceRelease: since)) },
+            onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) },
+            onKey: { [weak self] isEscape in self?.handle(.keyPressed(isEscape: isEscape)) })
         accessibilityItem.isHidden = fnMonitor != nil
         render()
         loadModel()
@@ -66,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func handle(_ event: AppEvent) {
         let (next, effects) = state.handling(event)
+        // Every keystroke lands here; most change nothing.
+        guard next != state || !effects.isEmpty else { return }
         state = next
         effects.forEach(perform)
         render()

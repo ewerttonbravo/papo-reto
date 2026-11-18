@@ -167,16 +167,28 @@ func recordingLimitOutsideRecordingIsIgnored(state: AppState) {
     #expect(effects.isEmpty)
 }
 
-@Test(arguments: [recording, handsFree, AppState(model: .loading, activity: .handsFree)])
-func cancelledWhileRecordingDiscards(state: AppState) {
-    let (next, effects) = state.handling(.cancelled)
-    #expect(next == AppState(model: state.model))
+@Test(arguments: [false, true])
+func keyWhileHoldingFnCancels(isEscape: Bool) {
+    let (state, effects) = AppState(model: .loading, activity: .recording).handling(.keyPressed(isEscape: isEscape))
+    #expect(state == AppState(model: .loading))
     #expect(effects == [.discardRecording])
 }
 
+@Test func escInHandsFreeCancels() {
+    let (state, effects) = handsFree.handling(.keyPressed(isEscape: true))
+    #expect(state == ready)
+    #expect(effects == [.discardRecording])
+}
+
+@Test func typingInHandsFreeKeepsRecording() {
+    let (state, effects) = handsFree.handling(.keyPressed(isEscape: false))
+    #expect(state == handsFree)
+    #expect(effects.isEmpty)
+}
+
 @Test(arguments: [ready, afterTap, transcribing, AppState()])
-func cancelledOutsideRecordingIsIgnored(state: AppState) {
-    let (next, effects) = state.handling(.cancelled)
+func escOutsideRecordingIsIgnored(state: AppState) {
+    let (next, effects) = state.handling(.keyPressed(isEscape: true))
     #expect(next == state)
     #expect(effects.isEmpty)
 }

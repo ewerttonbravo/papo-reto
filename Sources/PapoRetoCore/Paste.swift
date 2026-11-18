@@ -6,6 +6,8 @@ public protocol PasteboardPort {
     /// Writes text marked so that clipboard managers skip it (org.nspasteboard.TransientType).
     func writeTransient(_ text: String)
     func restore(_ snapshot: Snapshot)
+    /// True for a password from a password manager (org.nspasteboard.ConcealedType).
+    func isConcealed(_ snapshot: Snapshot) -> Bool
 }
 
 public protocol KeyboardPort {
@@ -17,9 +19,10 @@ public struct PendingRestore<Snapshot> {
     let snapshot: Snapshot
     let changeCount: Int
 
-    /// Skipped when someone wrote to the pasteboard after our text: their copy wins.
+    /// Skipped when someone wrote to the pasteboard after our text: their copy wins. Skipped for a
+    /// password too: writing it back as a new change stops its manager from clearing it later.
     public func restore<P: PasteboardPort>(on pasteboard: P) where P.Snapshot == Snapshot {
-        guard pasteboard.changeCount == changeCount else { return }
+        guard pasteboard.changeCount == changeCount, !pasteboard.isConcealed(snapshot) else { return }
         pasteboard.restore(snapshot)
     }
 }

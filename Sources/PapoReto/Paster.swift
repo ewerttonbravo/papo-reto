@@ -3,12 +3,14 @@ import PapoRetoCore
 
 /// NSPasteboard.general; the snapshot copies every item with every type, in the original order.
 struct SystemPasteboard: PasteboardPort {
+    typealias Snapshot = [[(NSPasteboard.PasteboardType, Data)]]
     private static let transient = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
+    private static let concealed = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
     private let pasteboard = NSPasteboard.general
 
     var changeCount: Int { pasteboard.changeCount }
 
-    func snapshot() -> [[(NSPasteboard.PasteboardType, Data)]] {
+    func snapshot() -> Snapshot {
         (pasteboard.pasteboardItems ?? []).map { item in
             item.types.compactMap { type in item.data(forType: type).map { (type, $0) } }
         }
@@ -22,7 +24,7 @@ struct SystemPasteboard: PasteboardPort {
         pasteboard.writeObjects([item])
     }
 
-    func restore(_ snapshot: [[(NSPasteboard.PasteboardType, Data)]]) {
+    func restore(_ snapshot: Snapshot) {
         let items = snapshot.map { types in
             let item = NSPasteboardItem()
             for (type, data) in types { item.setData(data, forType: type) }
@@ -31,11 +33,15 @@ struct SystemPasteboard: PasteboardPort {
         pasteboard.clearContents()
         pasteboard.writeObjects(items)
     }
+
+    func isConcealed(_ snapshot: Snapshot) -> Bool {
+        snapshot.contains { types in types.contains { $0.0 == Self.concealed } }
+    }
 }
 
 /// Synthetic Cmd+V to the focused app. Needs Accessibility, already granted for the Fn tap.
 struct SystemKeyboard: KeyboardPort {
-    /// kVK_ANSI_V; layouts that move V off this key (Dvorak) will not paste.
+    /// kVK_ANSI_V. Layouts that move V off this key send another shortcut: Dvorak gets Cmd+K.
     private static let vKey: CGKeyCode = 9
 
     func pressCmdV() {

@@ -48,15 +48,15 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.discardRecording])
 }
 
-@Test(arguments: [29, 30])
-func transcribedUpTo30sKeepsTheModel(seconds: Int) {
-    let (state, effects) = transcribing.handling(.transcribed(audio: .seconds(seconds)))
+@Test func transcribedWithFootprintUnder900MBKeepsTheModel() {
+    let (state, effects) = transcribing.handling(.transcribed(footprintMB: 899.9))
     #expect(state == ready)
     #expect(effects.isEmpty)
 }
 
-@Test func transcribedOver30sReloadsTheModel() {
-    let (state, effects) = transcribing.handling(.transcribed(audio: .milliseconds(30_001)))
+@Test(arguments: [900, 1005])
+func transcribedWithFootprintFrom900MBReloadsTheModel(footprintMB: Double) {
+    let (state, effects) = transcribing.handling(.transcribed(footprintMB: footprintMB))
     #expect(state == AppState(model: .loading))
     #expect(effects == [.reloadModel])
 }

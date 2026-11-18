@@ -2,6 +2,8 @@ public enum AppEvent: Sendable, Equatable {
     /// Any key down. Recording means Fn is held, so any key cancels; hands-free only Esc (ADR-005).
     case keyPressed(isEscape: Bool)
     case modelLoaded, modelFailed, recordingLimitReached
+    /// A model file is absent or fails its SHA-256: the adapter downloads it, then loads.
+    case downloadStarted
     /// nil on the first press since launch.
     case fnPressed(sinceRelease: Duration?)
     case fnReleased(heldFor: Duration)
@@ -14,7 +16,7 @@ public enum AppEffect: Sendable, Equatable {
 }
 
 public struct AppState: Sendable, Equatable {
-    public enum Model: Sendable { case loading, ready, unavailable }
+    public enum Model: Sendable { case loading, downloading, ready, unavailable }
     public enum Activity: Sendable { case idle, recording, handsFree, transcribing }
 
     /// Holding Fn longer than this is push-to-talk (ADR-005); shorter is a tap.
@@ -43,6 +45,7 @@ public struct AppState: Sendable, Equatable {
         case (.recording, _), (.handsFree, _): "mic.fill"
         case (.transcribing, _): "ellipsis.bubble"
         case (.idle, .loading): "hourglass"
+        case (.idle, .downloading): "arrow.down.circle"
         case (.idle, .ready): "mic"
         case (.idle, .unavailable): "exclamationmark.triangle"
         }
@@ -51,11 +54,15 @@ public struct AppState: Sendable, Equatable {
     public func handling(_ event: AppEvent) -> (state: AppState, effects: [AppEffect]) {
         var next = self
         switch (event, model, activity) {
-        case (.modelLoaded, .loading, _):
+        case (.modelLoaded, .loading, _), (.modelLoaded, .downloading, _):
             next.model = .ready
             return (next, activity == .transcribing ? [.transcribe] : [])
-        case (.modelFailed, .loading, _):
+        case (.modelFailed, .loading, _), (.modelFailed, .downloading, _):
             next.model = .unavailable
+            next.activity = .idle
+            return (next, activity == .idle ? [] : [.discardRecording])
+        case (.downloadStarted, .loading, _):
+            next.model = .downloading
             next.activity = .idle
             return (next, activity == .idle ? [] : [.discardRecording])
         case (.fnPressed(let sinceRelease), .loading, .idle), (.fnPressed(let sinceRelease), .ready, .idle):

@@ -15,7 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let recorder = AudioRecorder()
     private var pendingSamples: [Float] = []
     private var recordingLimit: Task<Void, Never>?
-    private let unavailableItem = NSMenuItem(title: "Model not found. Run scripts/fetch-deps.sh model", action: nil, keyEquivalent: "")
+    /// Download progress, or Retry after a failure.
+    private let modelItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let microphoneMenu = NSMenu()
     private let accessibilityItem = NSMenuItem(
         title: "Allow Accessibility in System Settings, then reopen Papo Reto", action: nil, keyEquivalent: "")
@@ -23,7 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
-        menu.addItem(unavailableItem)
+        modelItem.target = self
+        menu.addItem(modelItem)
         menu.addItem(accessibilityItem)
         let microphoneItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
         microphoneMenu.delegate = self
@@ -39,26 +41,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onKey: { [weak self] isEscape in self?.handle(.keyPressed(isEscape: isEscape)) })
         accessibilityItem.isHidden = fnMonitor != nil
         render()
-        loadModel()
+        prepareModel(verify: true)
     }
 
-    private func loadModel() {
+    /// `verify` checks every file's SHA-256 and downloads the ones that fail; the reload after a long audio skips it.
+    private func prepareModel(verify: Bool) {
         Task.detached(priority: .userInitiated) {
+            let dir = Transcriber.defaultModelDir
+            if verify {
+                let checkStart = ContinuousClock.now
+                let invalid = ModelStore.invalidFiles(in: dir)
+                log.info("model checked in \(ContinuousClock.now - checkStart, privacy: .public), \(invalid.count, privacy: .public) files to download")
+                if !invalid.isEmpty {
+                    await self.handle(.downloadStarted)
+                    let downloadStart = ContinuousClock.now
+                    do {
+                        try await ModelStore.download(invalid, to: dir) { status in
+                            Task { @MainActor in self.showDownload(status) }
+                        }
+                        log.info("model downloaded in \(ContinuousClock.now - downloadStart, privacy: .public)")
+                    } catch {
+                        // The domain and code, not the description, which can carry the user's path.
+                        let code = (error as NSError).code, domain = (error as NSError).domain
+                        log.error("model download failed: \(String(describing: type(of: error)), privacy: .public) \(domain, privacy: .public) \(code, privacy: .public)")
+                        await self.modelDidLoad(nil)
+                        return
+                    }
+                }
+            }
             let start = ContinuousClock.now
-            let transcriber = Transcriber()
+            let transcriber = Transcriber(modelDir: dir)
             let elapsed = ContinuousClock.now - start
             // In the app, ~220 MB freed by the load stay counted in the footprint until malloc
             // gives them back (609-692 MB → 450 MB). Not in Transcriber: in the bench the same
             // call adds ~7 MB after transcribing (891.5 → 899 MB, limit 900).
             malloc_zone_pressure_relief(nil, 0)
             if transcriber == nil {
-                log.error("model failed to load from \(Transcriber.defaultModelDir.path)")
+                log.error("model failed to load")
             } else {
                 log.info("model loaded in \(elapsed, privacy: .public)")
             }
             await self.modelDidLoad(transcriber)
         }
     }
+
+    /// A late status from a download that already ended must not cover Retry.
+    private func showDownload(_ status: String) {
+        if state.model == .downloading { modelItem.title = status }
+    }
+
+    @objc private func retry() { handle(.retryRequested) }
 
     private func modelDidLoad(_ transcriber: Transcriber?) {
         self.transcriber = transcriber
@@ -92,7 +124,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             log.info("reloading the model to give its RAM back")
             // Destroy before loading: both recognizers at once would peak at ~2.4 GB.
             transcriber = nil
-            loadModel()
+            prepareModel(verify: false)
+        case .prepareModel: prepareModel(verify: true)
         case .alertRecordingLimit:
             log.info("recording limit reached")
             NSSound(named: "Tink")?.play()
@@ -165,7 +198,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem?.button?.image = image
         // An unknown symbol name yields nil: show text so the menu (and "Quit") stays reachable.
         statusItem?.button?.title = image == nil ? "PR" : ""
-        unavailableItem.isHidden = state.model != .unavailable
+        modelItem.isHidden = state.model != .unavailable && state.model != .downloading
+        let failed = state.model == .unavailable
+        modelItem.action = failed ? #selector(retry) : nil
+        if failed { modelItem.title = "Model download failed. Retry" }
     }
 }
 

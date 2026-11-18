@@ -35,7 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = item
         fnMonitor = FnKeyMonitor(
             onPress: { [weak self] since in self?.handle(.fnPressed(sinceRelease: since)) },
-            onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) })
+            onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) },
+            onCancel: { [weak self] in self?.handle(.cancelled) })
         accessibilityItem.isHidden = fnMonitor != nil
         render()
         loadModel()

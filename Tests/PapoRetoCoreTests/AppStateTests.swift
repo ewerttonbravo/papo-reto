@@ -81,10 +81,17 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.stopRecording])
 }
 
-@Test func fnReleasedInHandsFreeKeepsRecording() {
-    let (state, effects) = handsFree.handling(.fnReleased(heldFor: .milliseconds(100)))
+@Test(arguments: [100, 300])
+func fnTappedInHandsFreeKeepsRecording(ms: Int) {
+    let (state, effects) = handsFree.handling(.fnReleased(heldFor: .milliseconds(ms)))
     #expect(state == handsFree)
     #expect(effects.isEmpty)
+}
+
+@Test func fnHeldOver300msInHandsFreeStopsAndTranscribes() {
+    let (state, effects) = handsFree.handling(.fnReleased(heldFor: .milliseconds(301)))
+    #expect(state == transcribing)
+    #expect(effects == [.stopRecording, .transcribe])
 }
 
 @Test func transcribedWithFootprintUnder900MBKeepsTheModel() {

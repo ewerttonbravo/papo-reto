@@ -72,6 +72,9 @@ public struct AppState: Sendable, Equatable {
             return stoppingToTranscribe(alertingLimit: false)
         case (.fnPressed, _, .handsFree):
             return stoppingToTranscribe(alertingLimit: false)
+        // A tap then a hold to talk: the hold's release ends it like push-to-talk.
+        case (.fnReleased(let held), _, .handsFree) where held > Self.holdThreshold:
+            return stoppingToTranscribe(alertingLimit: false)
         case (.cancelled, _, .recording), (.cancelled, _, .handsFree):
             next.activity = .idle
             return (next, [.discardRecording])

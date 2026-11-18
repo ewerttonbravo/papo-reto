@@ -1,12 +1,12 @@
 public enum AppEvent: Sendable, Equatable {
-    case modelLoaded, modelFailed, fnPressed
+    case modelLoaded, modelFailed, fnPressed, recordingLimitReached
     case fnReleased(heldFor: Duration)
     case transcribed(audio: Duration)
 }
 
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
-    case startRecording, stopRecording, discardRecording, transcribe, reloadModel
+    case startRecording, stopRecording, discardRecording, transcribe, reloadModel, alertRecordingLimit
 }
 
 public struct AppState: Sendable, Equatable {
@@ -17,6 +17,8 @@ public struct AppState: Sendable, Equatable {
     public static let holdThreshold = Duration.milliseconds(300)
     /// Transcribing longer audio leaves the recognizer holding RAM it never gives back (T01: 60 s → 1.1 GB).
     public static let reloadAfter = Duration.seconds(30)
+    /// A recording stops by itself here and is transcribed whole, which bounds the RAM peak.
+    public static let recordingLimit = Duration.seconds(120)
 
     public var model: Model
     public var activity: Activity
@@ -57,6 +59,10 @@ public struct AppState: Sendable, Equatable {
             }
             next.activity = .transcribing
             return (next, model == .ready ? [.stopRecording, .transcribe] : [.stopRecording])
+        case (.recordingLimitReached, _, .recording):
+            next.activity = .transcribing
+            return (next, model == .ready
+                ? [.stopRecording, .alertRecordingLimit, .transcribe] : [.stopRecording, .alertRecordingLimit])
         case (.transcribed(let audio), _, .transcribing):
             next.activity = .idle
             guard audio > Self.reloadAfter else { return (next, []) }

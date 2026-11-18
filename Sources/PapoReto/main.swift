@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var fnMonitor: FnKeyMonitor?
     private let recorder = AudioRecorder()
     private var pendingSamples: [Float] = []
+    private var recordingLimit: Task<Void, Never>?
     private let unavailableItem = NSMenuItem(title: "Model not found. Run scripts/fetch-deps.sh model", action: nil, keyEquivalent: "")
     private let microphoneMenu = NSMenu()
     private let accessibilityItem = NSMenuItem(
@@ -75,13 +76,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .startRecording:
             // Nothing saved means the default: skip asking Core Audio on every Fn press.
             recorder.start(from: savedMicrophone == nil ? nil : currentMicrophone(among: AudioDevices.inputs()))
-        case .stopRecording: pendingSamples = recorder.stop()
-        case .discardRecording: _ = recorder.stop(); pendingSamples = []
+            recordingLimit = Task { [weak self] in
+                do { try await Task.sleep(for: AppState.recordingLimit) } catch { return }
+                self?.handle(.recordingLimitReached)
+            }
+        case .stopRecording: recordingLimit?.cancel(); pendingSamples = recorder.stop()
+        case .discardRecording: recordingLimit?.cancel(); _ = recorder.stop(); pendingSamples = []
         case .transcribe: transcribe()
         case .reloadModel:
+            log.info("reloading the model to give back the RAM of long audio")
             // Destroy before loading: both recognizers at once would peak at ~2.4 GB.
             transcriber = nil
             loadModel()
+        case .alertRecordingLimit:
+            log.info("recording limit reached")
+            NSSound(named: "Tink")?.play()
         }
     }
 

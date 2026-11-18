@@ -8,11 +8,14 @@ private let log = Logger(subsystem: "papo-reto", category: "audio")
 final class AudioRecorder: @unchecked Sendable {
     private static let format = AVAudioFormat(
         commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
-    private let engine = AVAudioEngine()
+    private var engine: AVAudioEngine?
     private let lock = NSLock()
     private var samples: [Float] = []
 
     func start() {
+        // A new engine per recording follows the current default input and its format;
+        // a reused one can keep a stale format after a device change and crash in installTap.
+        let engine = AVAudioEngine()
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
         guard let converter = AVAudioConverter(from: inputFormat, to: Self.format) else {
@@ -25,6 +28,7 @@ final class AudioRecorder: @unchecked Sendable {
         }
         do {
             try engine.start()
+            self.engine = engine
         } catch {
             input.removeTap(onBus: 0)
             log.error("microphone did not start: \(error, privacy: .public)")
@@ -33,8 +37,9 @@ final class AudioRecorder: @unchecked Sendable {
 
     /// Stops the engine and hands over what was recorded.
     func stop() -> [Float] {
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        engine?.inputNode.removeTap(onBus: 0)
+        engine?.stop()
+        engine = nil
         return lock.withLock {
             defer { samples = [] }
             return samples

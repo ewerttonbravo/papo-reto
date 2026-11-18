@@ -1,4 +1,7 @@
 import AppKit
+import os
+
+private let log = Logger(subsystem: "papo-reto", category: "fn")
 
 /// Fn press and release from a listen-only event tap on flagsChanged. Needs Accessibility.
 @MainActor
@@ -29,15 +32,20 @@ final class FnKeyMonitor {
                 return Unmanaged.passUnretained(event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
-        ) else { return nil }
+        ) else {
+            log.error("event tap not created although Accessibility is granted")
+            return nil
+        }
         self.tap = tap
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, tap, 0), .commonModes)
     }
 
     private func handle(_ type: CGEventType, fnDown: Bool) {
+        var fnDown = fnDown
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            return
+            // Fn may have changed while the tap was off; a lost release would keep the microphone on.
+            fnDown = CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn)
         }
         switch (fnDown, pressedAt) {
         case (true, nil):

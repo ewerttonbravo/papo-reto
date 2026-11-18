@@ -2,7 +2,9 @@
 
 Voice dictation for macOS, focused on Brazilian Portuguese (PT-BR), 100% local. Hold `Fn`, speak, release: the text appears at the cursor.
 
-In development: for now the app loads the model in the background and its menu bar icon goes from loading (hourglass) to ready (mic); dictation is not wired yet.
+In development: for now, holding `Fn` for more than 300 ms records the default microphone, and on release the transcribed text goes to the clipboard (pasting at the cursor comes next). A press while the model is still loading (hourglass icon) is transcribed once it is ready.
+
+The first launch asks for Accessibility (to read the `Fn` key; grant it and reopen the app) and, on the first dictation, for the Microphone. Set System Settings → Keyboard → "Press 🌐 key to" → "Do Nothing", or macOS also acts on `Fn`.
 
 ## Build and run
 Requires macOS 13+ and the Command Line Tools (`xcode-select --install`) or Xcode.

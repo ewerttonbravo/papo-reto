@@ -16,6 +16,8 @@
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Papo Reto records only while you hold Fn and transcribes on this Mac.</string>
 	<key>LSUIElement</key>
 	<true/>
 </dict>

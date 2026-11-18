@@ -8,17 +8,27 @@ private let log = Logger(subsystem: "papo-reto", category: "model")
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
-    private var state = AppState.loading
+    private var state = AppState()
     private var transcriber: Transcriber?
+    private var fnMonitor: FnKeyMonitor?
+    private let recorder = AudioRecorder()
+    private var pendingSamples: [Float] = []
     private let unavailableItem = NSMenuItem(title: "Model not found. Run scripts/fetch-deps.sh model", action: nil, keyEquivalent: "")
+    private let accessibilityItem = NSMenuItem(
+        title: "Allow Accessibility in System Settings, then reopen Papo Reto", action: nil, keyEquivalent: "")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
         menu.addItem(unavailableItem)
+        menu.addItem(accessibilityItem)
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+        fnMonitor = FnKeyMonitor(
+            onPress: { [weak self] in self?.handle(.fnPressed) },
+            onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) })
+        accessibilityItem.isHidden = fnMonitor != nil
         render()
         loadModel()
     }
@@ -43,8 +53,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func modelDidLoad(_ transcriber: Transcriber?) {
         self.transcriber = transcriber
-        state = state.handling(transcriber == nil ? .modelFailed : .modelLoaded)
+        handle(transcriber == nil ? .modelFailed : .modelLoaded)
+    }
+
+    private func handle(_ event: AppEvent) {
+        let (next, effects) = state.handling(event)
+        state = next
+        effects.forEach(perform)
         render()
+    }
+
+    private func perform(_ effect: AppEffect) {
+        switch effect {
+        case .startRecording: recorder.start()
+        case .stopRecording: pendingSamples = recorder.stop()
+        case .discardRecording: _ = recorder.stop(); pendingSamples = []
+        case .transcribe: transcribe()
+        }
+    }
+
+    /// The Core asks for `.transcribe` only with the model ready, one transcription at a time.
+    private func transcribe() {
+        guard let transcriber else { return }
+        let samples = pendingSamples
+        pendingSamples = []
+        Task.detached(priority: .userInitiated) {
+            let start = ContinuousClock.now
+            let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
+            let seconds = Double(samples.count) / 16000
+            log.info("transcribed \(seconds, format: .fixed(precision: 1), privacy: .public) s of audio in \(ContinuousClock.now - start, privacy: .public)")
+            await self.didTranscribe(text)
+        }
+    }
+
+    private func didTranscribe(_ transcription: String) {
+        if let text = finalText(transcription) {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
+        handle(.transcribed)
     }
 
     private func render() {
@@ -53,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.button?.image = image
         // An unknown symbol name yields nil: show text so the menu (and "Quit") stays reachable.
         statusItem?.button?.title = image == nil ? "PR" : ""
-        unavailableItem.isHidden = state != .modelUnavailable
+        unavailableItem.isHidden = state.model != .unavailable
     }
 }
 

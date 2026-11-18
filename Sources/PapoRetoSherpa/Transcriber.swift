@@ -2,7 +2,8 @@ import CSherpaOnnx
 import Foundation
 
 /// Parakeet TDT v3 through the sherpa-onnx C API. Load once, then one stream per transcription.
-public final class Transcriber {
+/// `@unchecked Sendable`: callers run one transcription at a time (the app's Core state machine serializes them).
+public final class Transcriber: @unchecked Sendable {
     public static let defaultModelDir = FileManager.default
         .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("PapoReto/Models/parakeet-tdt-0.6b-v3-int8")
@@ -39,6 +40,7 @@ public final class Transcriber {
 
     /// Samples are mono Float32 in [-1, 1].
     public func transcribe(samples: [Float], sampleRate: Int32) -> String {
+        guard !samples.isEmpty else { return "" }
         let stream = SherpaOnnxCreateOfflineStream(recognizer)
         defer { SherpaOnnxDestroyOfflineStream(stream) }
         SherpaOnnxAcceptWaveformOffline(stream, sampleRate, samples, Int32(samples.count))

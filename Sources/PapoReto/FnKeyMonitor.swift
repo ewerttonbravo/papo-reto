@@ -11,8 +11,9 @@ final class FnKeyMonitor {
     private let onRelease: (Duration) -> Void
     private let onCancel: () -> Void
     private var tap: CFMachPort?
-    private var pressedAt: ContinuousClock.Instant?
-    private var releasedAt: ContinuousClock.Instant?
+    /// Event times in nanoseconds of uptime.
+    private var pressedAt: UInt64?
+    private var releasedAt: UInt64?
 
     /// Nil without Accessibility; the system prompt asks for it once.
     init?(onPress: @escaping (Duration?) -> Void, onRelease: @escaping (Duration) -> Void, onCancel: @escaping () -> Void) {
@@ -28,11 +29,14 @@ final class FnKeyMonitor {
             callback: { _, type, event, info in
                 let fnDown = event.flags.contains(.maskSecondaryFn)
                 let isEscape = type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53
+                // When the key moved, not when this runs: a cold microphone start blocks the main
+                // thread ~300 ms and a quick tap queued behind it would read as a hold.
+                let time = type == .flagsChanged ? event.timestamp : clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
                 let address = UInt(bitPattern: info)
                 // The tap's run loop source is on the main run loop.
                 MainActor.assumeIsolated {
                     let monitor = Unmanaged<FnKeyMonitor>.fromOpaque(UnsafeRawPointer(bitPattern: address)!)
-                    monitor.takeUnretainedValue().handle(type, fnDown: fnDown, isEscape: isEscape)
+                    monitor.takeUnretainedValue().handle(type, fnDown: fnDown, isEscape: isEscape, at: time)
                 }
                 return Unmanaged.passUnretained(event)
             },
@@ -45,7 +49,7 @@ final class FnKeyMonitor {
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, tap, 0), .commonModes)
     }
 
-    private func handle(_ type: CGEventType, fnDown: Bool, isEscape: Bool) {
+    private func handle(_ type: CGEventType, fnDown: Bool, isEscape: Bool, at time: UInt64) {
         if type == .keyDown {
             // Arrows and F-keys carry the Fn flag without Fn held, so "held" is this monitor's own state.
             if isEscape || pressedAt != nil { onCancel() }
@@ -59,12 +63,12 @@ final class FnKeyMonitor {
         }
         switch (fnDown, pressedAt) {
         case (true, nil):
-            pressedAt = .now
-            onPress(releasedAt.map { .now - $0 })
+            pressedAt = time
+            onPress(releasedAt.map { .nanoseconds(Int64(time) - Int64($0)) })
         case (false, let start?):
             pressedAt = nil
-            releasedAt = .now
-            onRelease(.now - start)
+            releasedAt = time
+            onRelease(.nanoseconds(Int64(time) - Int64(start)))
         default:
             break
         }

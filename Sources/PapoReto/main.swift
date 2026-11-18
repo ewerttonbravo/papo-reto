@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .discardRecording: recordingLimit?.cancel(); _ = recorder.stop(); pendingSamples = []
         case .transcribe: transcribe()
         case .reloadModel:
-            log.info("reloading the model to give back the RAM of long audio")
+            log.info("reloading the model to give its RAM back")
             // Destroy before loading: both recognizers at once would peak at ~2.4 GB.
             transcriber = nil
             loadModel()
@@ -101,18 +101,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let transcriber else { return }
         let samples = pendingSamples
         pendingSamples = []
-        let audio = Duration.seconds(Double(samples.count) / 16000)
         let work = Task.detached(priority: .userInitiated) {
             let start = ContinuousClock.now
             let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
-            log.info("transcribed \(audio, privacy: .public) of audio in \(ContinuousClock.now - start, privacy: .public)")
-            return text
+            let seconds = Double(samples.count) / 16000
+            let footprint = processMemory().footprint
+            log.info("transcribed \(seconds, format: .fixed(precision: 1), privacy: .public) s of audio in \(ContinuousClock.now - start, privacy: .public), footprint \(footprint, format: .fixed(precision: 0), privacy: .public) MB")
+            return (text, footprint)
         }
         // Only the finished detached task held the recognizer, so a reload frees it before loading the new one.
-        Task { didTranscribe(await work.value, audio: audio) }
+        Task {
+            let (text, footprint) = await work.value
+            didTranscribe(text, footprintMB: footprint)
+        }
     }
 
-    private func didTranscribe(_ transcription: String, audio: Duration) {
+    private func didTranscribe(_ transcription: String, footprintMB: Double) {
         if let text = finalText(transcription) {
             let pasteboard = SystemPasteboard()
             let pending = paste(text, pasteboard: pasteboard, keyboard: SystemKeyboard())
@@ -122,7 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 pending.restore(on: pasteboard)
             }
         }
-        handle(.transcribed(audio: audio))
+        handle(.transcribed(footprintMB: footprintMB))
     }
 
     private var savedMicrophone: String? { UserDefaults.standard.string(forKey: Self.microphoneKey) }

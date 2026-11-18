@@ -1,7 +1,7 @@
 public enum AppEvent: Sendable, Equatable {
     case modelLoaded, modelFailed, fnPressed, recordingLimitReached
     case fnReleased(heldFor: Duration)
-    case transcribed(audio: Duration)
+    case transcribed(footprintMB: Double)
 }
 
 /// What the adapters must do after a transition.
@@ -15,8 +15,8 @@ public struct AppState: Sendable, Equatable {
 
     /// Holding Fn longer than this is push-to-talk (ADR-005); shorter is a tap.
     public static let holdThreshold = Duration.milliseconds(300)
-    /// Transcribing longer audio leaves the recognizer holding RAM it never gives back (T01: 60 s → 1.1 GB).
-    public static let reloadAfter = Duration.seconds(30)
+    /// The recognizer keeps the RAM of the longest audio it saw (app: 28.5 s → 1,005 MB); at the budget it is recreated.
+    public static let reloadAtFootprintMB = BenchBudget.reference.maxFootprintMB
     /// A recording stops by itself here and is transcribed whole, which bounds the RAM peak.
     public static let recordingLimit = Duration.seconds(120)
 
@@ -60,9 +60,9 @@ public struct AppState: Sendable, Equatable {
             return stoppingToTranscribe(alertingLimit: false)
         case (.recordingLimitReached, _, .recording):
             return stoppingToTranscribe(alertingLimit: true)
-        case (.transcribed(let audio), _, .transcribing):
+        case (.transcribed(let footprintMB), _, .transcribing):
             next.activity = .idle
-            guard audio > Self.reloadAfter else { return (next, []) }
+            guard footprintMB >= Self.reloadAtFootprintMB else { return (next, []) }
             next.model = .loading
             return (next, [.reloadModel])
         default:

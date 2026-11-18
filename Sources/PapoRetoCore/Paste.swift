@@ -16,6 +16,12 @@ public protocol KeyboardPort {
 public struct PendingRestore<Snapshot> {
     let snapshot: Snapshot
     let changeCount: Int
+
+    /// Skipped when someone wrote to the pasteboard after our text: their copy wins.
+    public func restore<P: PasteboardPort>(on pasteboard: P) where P.Snapshot == Snapshot {
+        guard pasteboard.changeCount == changeCount else { return }
+        pasteboard.restore(snapshot)
+    }
 }
 
 /// Pastes `text` at the cursor through the pasteboard, keeping what it held before.

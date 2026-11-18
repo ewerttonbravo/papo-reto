@@ -78,6 +78,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .stopRecording: pendingSamples = recorder.stop()
         case .discardRecording: _ = recorder.stop(); pendingSamples = []
         case .transcribe: transcribe()
+        case .reloadModel:
+            // Destroy before loading: both recognizers at once would peak at ~2.4 GB.
+            transcriber = nil
+            loadModel()
         }
     }
 
@@ -86,16 +90,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let transcriber else { return }
         let samples = pendingSamples
         pendingSamples = []
-        Task.detached(priority: .userInitiated) {
-            let start = ContinuousClock.now
-            let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
-            let seconds = Double(samples.count) / 16000
-            log.info("transcribed \(seconds, format: .fixed(precision: 1), privacy: .public) s of audio in \(ContinuousClock.now - start, privacy: .public)")
-            await self.didTranscribe(text)
+        let audio = Duration.seconds(Double(samples.count) / 16000)
+        Task {
+            // The detached task ends before the reload, so it never keeps the old recognizer alive.
+            let text = await Task.detached(priority: .userInitiated) {
+                let start = ContinuousClock.now
+                let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
+                log.info("transcribed \(audio, privacy: .public) of audio in \(ContinuousClock.now - start, privacy: .public)")
+                return text
+            }.value
+            didTranscribe(text, audio: audio)
         }
     }
 
-    private func didTranscribe(_ transcription: String) {
+    private func didTranscribe(_ transcription: String, audio: Duration) {
         if let text = finalText(transcription) {
             let pasteboard = SystemPasteboard()
             let pending = paste(text, pasteboard: pasteboard, keyboard: SystemKeyboard())
@@ -105,7 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 pending.restore(on: pasteboard)
             }
         }
-        handle(.transcribed)
+        handle(.transcribed(audio: audio))
     }
 
     private var savedMicrophone: String? { UserDefaults.standard.string(forKey: Self.microphoneKey) }

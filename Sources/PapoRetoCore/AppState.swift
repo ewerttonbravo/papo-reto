@@ -1,11 +1,12 @@
 public enum AppEvent: Sendable, Equatable {
-    case modelLoaded, modelFailed, fnPressed, transcribed
+    case modelLoaded, modelFailed, fnPressed
     case fnReleased(heldFor: Duration)
+    case transcribed(audio: Duration)
 }
 
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
-    case startRecording, stopRecording, discardRecording, transcribe
+    case startRecording, stopRecording, discardRecording, transcribe, reloadModel
 }
 
 public struct AppState: Sendable, Equatable {
@@ -14,6 +15,8 @@ public struct AppState: Sendable, Equatable {
 
     /// Holding Fn longer than this is push-to-talk (ADR-005); shorter is a tap.
     public static let holdThreshold = Duration.milliseconds(300)
+    /// Transcribing longer audio leaves the recognizer holding RAM it never gives back (T01: 60 s → 1.1 GB).
+    public static let reloadAfter = Duration.seconds(30)
 
     public var model: Model
     public var activity: Activity
@@ -54,9 +57,11 @@ public struct AppState: Sendable, Equatable {
             }
             next.activity = .transcribing
             return (next, model == .ready ? [.stopRecording, .transcribe] : [.stopRecording])
-        case (.transcribed, _, .transcribing):
+        case (.transcribed(let audio), _, .transcribing):
             next.activity = .idle
-            return (next, [])
+            guard audio > Self.reloadAfter else { return (next, []) }
+            next.model = .loading
+            return (next, [.reloadModel])
         default:
             return (self, [])
         }

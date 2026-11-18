@@ -77,7 +77,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Nothing saved means the default: skip asking Core Audio on every Fn press.
             recorder.start(from: savedMicrophone == nil ? nil : currentMicrophone(among: AudioDevices.inputs()))
             recordingLimit = Task { [weak self] in
-                do { try await Task.sleep(for: AppState.recordingLimit) } catch { return }
+                try? await Task.sleep(for: AppState.recordingLimit)
+                // A cancel can land after the sleep ends; without this, a stale timer stops the next recording.
+                guard !Task.isCancelled else { return }
                 self?.handle(.recordingLimitReached)
             }
         case .stopRecording: recordingLimit?.cancel(); pendingSamples = recorder.stop()
@@ -100,16 +102,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let samples = pendingSamples
         pendingSamples = []
         let audio = Duration.seconds(Double(samples.count) / 16000)
-        Task {
-            // The detached task ends before the reload, so it never keeps the old recognizer alive.
-            let text = await Task.detached(priority: .userInitiated) {
-                let start = ContinuousClock.now
-                let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
-                log.info("transcribed \(audio, privacy: .public) of audio in \(ContinuousClock.now - start, privacy: .public)")
-                return text
-            }.value
-            didTranscribe(text, audio: audio)
+        let work = Task.detached(priority: .userInitiated) {
+            let start = ContinuousClock.now
+            let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
+            log.info("transcribed \(audio, privacy: .public) of audio in \(ContinuousClock.now - start, privacy: .public)")
+            return text
         }
+        // Only the finished detached task held the recognizer, so a reload frees it before loading the new one.
+        Task { didTranscribe(await work.value, audio: audio) }
     }
 
     private func didTranscribe(_ transcription: String, audio: Duration) {

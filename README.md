@@ -14,6 +14,8 @@ make app    # builds build/PapoReto.app for local use
 make run    # builds and opens the app
 ```
 
+Optional, once per Mac: `scripts/dev-cert.sh` creates a free self-signed certificate, "Papo Reto Dev", in your login keychain (macOS asks for your password to trust it for code signing). `make app` then signs with it, and the Microphone and Accessibility permissions survive rebuilds. Without it, `make app` signs ad-hoc and macOS asks for them again after each build.
+
 Without the model the menu bar shows a warning icon and the menu says how to fetch it. `make test` and `make app` download the prebuilt [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) libs into `vendor/`, checking their SHA-256.
 
 ## Benchmark

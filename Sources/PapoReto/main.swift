@@ -88,8 +88,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func didTranscribe(_ transcription: String) {
         if let text = finalText(transcription) {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
+            let pasteboard = SystemPasteboard()
+            let pending = paste(text, pasteboard: pasteboard, keyboard: SystemKeyboard())
+            // Time for the focused app to read the text before the user's clipboard comes back.
+            Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                pending.restore(on: pasteboard)
+            }
         }
         handle(.transcribed)
     }

@@ -4,6 +4,8 @@ public enum AppEvent: Sendable, Equatable {
     case modelLoaded, modelFailed, recordingLimitReached
     /// A model file is absent or fails its SHA-256: the adapter downloads it, then loads.
     case downloadStarted
+    /// The menu's Retry after a failed download or load.
+    case retryRequested
     /// nil on the first press since launch.
     case fnPressed(sinceRelease: Duration?)
     case fnReleased(heldFor: Duration)
@@ -13,6 +15,8 @@ public enum AppEvent: Sendable, Equatable {
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
     case startRecording, stopRecording, discardRecording, transcribe, reloadModel, alertRecordingLimit
+    /// Check every file's SHA-256, download what fails, then load.
+    case prepareModel
 }
 
 public struct AppState: Sendable, Equatable {
@@ -61,6 +65,8 @@ public struct AppState: Sendable, Equatable {
             return droppingAudio(model: .unavailable)
         case (.downloadStarted, .loading, _):
             return droppingAudio(model: .downloading)
+        case (.retryRequested, .unavailable, _):
+            return (AppState(), [.prepareModel])
         case (.fnPressed(let sinceRelease), .loading, .idle), (.fnPressed(let sinceRelease), .ready, .idle):
             let doubleTap = afterTap && sinceRelease.map { $0 < Self.doubleTapWindow } == true
             next.activity = doubleTap ? .handsFree : .recording

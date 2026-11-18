@@ -94,3 +94,28 @@ func fnIgnoredWhenModelUnavailableOrTranscribing(state: AppState) {
     #expect(next == state)
     #expect(effects.isEmpty)
 }
+
+@Test func recordingLimitStopsTranscribesAndAlerts() {
+    let (state, effects) = recording.handling(.recordingLimitReached)
+    #expect(state == transcribing)
+    #expect(effects == [.stopRecording, .alertRecordingLimit, .transcribe])
+}
+
+@Test func recordingLimitWhileLoadingWaitsForTheModel() {
+    let (state, effects) = AppState(model: .loading, activity: .recording).handling(.recordingLimitReached)
+    #expect(state == AppState(model: .loading, activity: .transcribing))
+    #expect(effects == [.stopRecording, .alertRecordingLimit])
+}
+
+@Test(arguments: [ready, transcribing])
+func recordingLimitOutsideRecordingIsIgnored(state: AppState) {
+    let (next, effects) = state.handling(.recordingLimitReached)
+    #expect(next == state)
+    #expect(effects.isEmpty)
+}
+
+@Test func fnReleasedAfterTheLimitIsIgnored() {
+    let (state, effects) = transcribing.handling(.fnReleased(heldFor: .seconds(125)))
+    #expect(state == transcribing)
+    #expect(effects.isEmpty)
+}

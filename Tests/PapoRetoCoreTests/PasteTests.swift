@@ -20,3 +20,19 @@ private final class FakePasteboard: PasteboardPort, KeyboardPort {
     _ = paste("Bom dia.", pasteboard: pasteboard, keyboard: pasteboard)
     #expect(pasteboard.calls == ["snapshot", "write Bom dia.", "cmd+v"])
 }
+
+@Test func restoreBringsBackThePreviousClipboard() {
+    let pasteboard = FakePasteboard(["copied before", "image"])
+    let pending = paste("Bom dia.", pasteboard: pasteboard, keyboard: pasteboard)
+    pending.restore(on: pasteboard)
+    #expect(pasteboard.items == ["copied before", "image"])
+}
+
+@Test func restoreKeepsAClipboardChangedAfterThePaste() {
+    let pasteboard = FakePasteboard(["copied before"])
+    let pending = paste("Bom dia.", pasteboard: pasteboard, keyboard: pasteboard)
+    pasteboard.items = ["copied by the user"]
+    pasteboard.changeCount += 1
+    pending.restore(on: pasteboard)
+    #expect(pasteboard.items == ["copied by the user"])
+}

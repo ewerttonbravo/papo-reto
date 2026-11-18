@@ -48,10 +48,17 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.discardRecording])
 }
 
-@Test func transcribedGoesBackToIdle() {
-    let (state, effects) = transcribing.handling(.transcribed)
+@Test(arguments: [29, 30])
+func transcribedUpTo30sKeepsTheModel(seconds: Int) {
+    let (state, effects) = transcribing.handling(.transcribed(audio: .seconds(seconds)))
     #expect(state == ready)
     #expect(effects.isEmpty)
+}
+
+@Test func transcribedOver30sReloadsTheModel() {
+    let (state, effects) = transcribing.handling(.transcribed(audio: .milliseconds(30_001)))
+    #expect(state == AppState(model: .loading))
+    #expect(effects == [.reloadModel])
 }
 
 @Test func fnPressedWhileLoadingStartsRecording() {

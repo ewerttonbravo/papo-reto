@@ -218,3 +218,15 @@ func escOutsideRecordingIsIgnored(state: AppState) {
     #expect(next == state)
     #expect(effects.isEmpty)
 }
+
+@Test func retryRequestedWhenUnavailablePreparesTheModel() {
+    let (state, effects) = AppState(model: .unavailable).handling(.retryRequested)
+    #expect(state == AppState())
+    #expect(effects == [.prepareModel])
+}
+
+/// A second click while the first retry runs must not start another download.
+@Test(arguments: [AppState(), downloading, ready])
+func retryRequestedOutsideUnavailableIsIgnored(state: AppState) {
+    #expect(state.handling(.retryRequested) == (state, []))
+}

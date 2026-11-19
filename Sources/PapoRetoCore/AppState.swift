@@ -2,6 +2,10 @@ public enum AppEvent: Sendable, Equatable {
     /// Any key down. Recording means Fn is held, so any key cancels; hands-free only Esc (ADR-005).
     case keyPressed(isEscape: Bool)
     case modelLoaded, modelFailed, recordingLimitReached
+    /// A model file is absent or truncated: the adapter downloads it, verifies its SHA-256, then loads.
+    case downloadStarted
+    /// The menu's Retry after a failed download or load.
+    case retryRequested
     /// nil on the first press since launch.
     case fnPressed(sinceRelease: Duration?)
     case fnReleased(heldFor: Duration)
@@ -11,10 +15,12 @@ public enum AppEvent: Sendable, Equatable {
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
     case startRecording, stopRecording, discardRecording, transcribe, reloadModel, alertRecordingLimit
+    /// Check every file's SHA-256 (Retry: the launch checks sizes), download what fails, then load.
+    case prepareModel
 }
 
 public struct AppState: Sendable, Equatable {
-    public enum Model: Sendable { case loading, ready, unavailable }
+    public enum Model: Sendable { case loading, downloading, ready, unavailable }
     public enum Activity: Sendable { case idle, recording, handsFree, transcribing }
 
     /// Holding Fn longer than this is push-to-talk (ADR-005); shorter is a tap.
@@ -43,6 +49,7 @@ public struct AppState: Sendable, Equatable {
         case (.recording, _), (.handsFree, _): "mic.fill"
         case (.transcribing, _): "ellipsis.bubble"
         case (.idle, .loading): "hourglass"
+        case (.idle, .downloading): "arrow.down.circle"
         case (.idle, .ready): "mic"
         case (.idle, .unavailable): "exclamationmark.triangle"
         }
@@ -51,13 +58,15 @@ public struct AppState: Sendable, Equatable {
     public func handling(_ event: AppEvent) -> (state: AppState, effects: [AppEffect]) {
         var next = self
         switch (event, model, activity) {
-        case (.modelLoaded, .loading, _):
+        case (.modelLoaded, .loading, _), (.modelLoaded, .downloading, _):
             next.model = .ready
             return (next, activity == .transcribing ? [.transcribe] : [])
-        case (.modelFailed, .loading, _):
-            next.model = .unavailable
-            next.activity = .idle
-            return (next, activity == .idle ? [] : [.discardRecording])
+        case (.modelFailed, .loading, _), (.modelFailed, .downloading, _):
+            return droppingAudio(model: .unavailable)
+        case (.downloadStarted, .loading, _):
+            return droppingAudio(model: .downloading)
+        case (.retryRequested, .unavailable, _):
+            return (AppState(), [.prepareModel])
         case (.fnPressed(let sinceRelease), .loading, .idle), (.fnPressed(let sinceRelease), .ready, .idle):
             let doubleTap = afterTap && sinceRelease.map { $0 < Self.doubleTapWindow } == true
             next.activity = doubleTap ? .handsFree : .recording
@@ -88,6 +97,11 @@ public struct AppState: Sendable, Equatable {
         default:
             return (self, [])
         }
+    }
+
+    /// Audio waiting for this model would wait forever (or for minutes): drop it.
+    private func droppingAudio(model: Model) -> (state: AppState, effects: [AppEffect]) {
+        (AppState(model: model), activity == .idle ? [] : [.discardRecording])
     }
 
     /// Without the model the audio waits; `.modelLoaded` transcribes it.

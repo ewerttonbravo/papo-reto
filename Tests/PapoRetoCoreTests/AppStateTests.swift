@@ -6,9 +6,10 @@ private let recording = AppState(model: .ready, activity: .recording)
 private let transcribing = AppState(model: .ready, activity: .transcribing)
 private let handsFree = AppState(model: .ready, activity: .handsFree)
 private let afterTap = AppState(model: .ready, afterTap: true)
+private let downloading = AppState(model: .downloading)
 
 @Test func everyStateHasADistinctIcon() {
-    let shown = [AppState(), ready, AppState(model: .unavailable), recording, transcribing]
+    let shown = [AppState(), ready, AppState(model: .unavailable), downloading, recording, transcribing]
     let icons = shown.map(\.iconName)
     #expect(!icons.contains(""))
     #expect(Set(icons).count == shown.count)
@@ -29,6 +30,31 @@ private let afterTap = AppState(model: .ready, afterTap: true)
 @Test func modelEventsOutsideLoadingKeepTheState() {
     #expect(ready.handling(.modelFailed).state == ready)
     #expect(recording.handling(.modelLoaded).state == recording)
+}
+
+@Test func downloadStartedWhileLoadingGoesDownloading() {
+    let (state, effects) = AppState().handling(.downloadStarted)
+    #expect(state == downloading)
+    #expect(effects.isEmpty)
+}
+
+/// A press during the hash check would otherwise wait minutes for the download.
+@Test(arguments: [AppState.Activity.recording, .handsFree, .transcribing])
+func downloadStartedWithAudioDiscardsIt(activity: AppState.Activity) {
+    let (state, effects) = AppState(activity: activity).handling(.downloadStarted)
+    #expect(state == downloading)
+    #expect(effects == [.discardRecording])
+}
+
+@Test func fnPressedWhileDownloadingIsIgnored() {
+    let (state, effects) = downloading.handling(.fnPressed(sinceRelease: nil))
+    #expect(state == downloading)
+    #expect(effects.isEmpty)
+}
+
+@Test func modelEventsWhileDownloadingFinishIt() {
+    #expect(downloading.handling(.modelLoaded) == (ready, []))
+    #expect(downloading.handling(.modelFailed) == (AppState(model: .unavailable), []))
 }
 
 @Test func fnPressedWhenReadyStartsRecording() {
@@ -191,4 +217,16 @@ func escOutsideRecordingIsIgnored(state: AppState) {
     let (next, effects) = state.handling(.keyPressed(isEscape: true))
     #expect(next == state)
     #expect(effects.isEmpty)
+}
+
+@Test func retryRequestedWhenUnavailablePreparesTheModel() {
+    let (state, effects) = AppState(model: .unavailable).handling(.retryRequested)
+    #expect(state == AppState())
+    #expect(effects == [.prepareModel])
+}
+
+/// A second click while the first retry runs must not start another download.
+@Test(arguments: [AppState(), downloading, ready])
+func retryRequestedOutsideUnavailableIsIgnored(state: AppState) {
+    #expect(state.handling(.retryRequested) == (state, []))
 }

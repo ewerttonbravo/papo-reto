@@ -84,6 +84,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     log.info("accessibility list changed, trusted: \(AXIsProcessTrusted(), privacy: .public)")
                     self.startFnMonitor()
                 }
+                // Posted ~5 ms before tccd records the grant, and only once (macOS 26): look again later.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    MainActor.assumeIsolated { self.startFnMonitor() }
+                }
             }
         }
     }

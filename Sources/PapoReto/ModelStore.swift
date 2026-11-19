@@ -14,6 +14,11 @@ enum ModelStore {
         }
     }
 
+    /// Files whose SHA-256 fails, for Retry: ~2.5 s, too slow for every launch.
+    static func invalidFiles(in dir: URL) -> [ModelFile] {
+        ParakeetModel.files.filter { !$0.isValid(sha256: sha256(of: dir.appendingPathComponent($0.name))) }
+    }
+
     /// Each file goes to `<name>.part` and is renamed only after its hash matches; an interrupted file starts over.
     static func download(_ files: [ModelFile], to dir: URL, progress: @escaping @Sendable (String) -> Void) async throws {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

@@ -41,32 +41,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onKey: { [weak self] isEscape in self?.handle(.keyPressed(isEscape: isEscape)) })
         accessibilityItem.isHidden = fnMonitor != nil
         render()
-        prepareModel(verify: true)
+        prepareModel(hashing: false)
     }
 
-    /// `verify` checks every file's size and downloads the ones that fail; the reload after a long audio skips it.
-    private func prepareModel(verify: Bool) {
+    /// Checks every file (by size; by SHA-256 when `hashing`), downloads the ones that fail, then loads.
+    private func prepareModel(hashing: Bool) {
         Task.detached(priority: .userInitiated) {
             let dir = Transcriber.defaultModelDir
-            if verify {
-                let checkStart = ContinuousClock.now
-                let invalid = ModelStore.missingFiles(in: dir)
-                log.info("model checked in \(ContinuousClock.now - checkStart, privacy: .public), \(invalid.count, privacy: .public) files to download")
-                if !invalid.isEmpty {
-                    await self.handle(.downloadStarted)
-                    let downloadStart = ContinuousClock.now
-                    do {
-                        try await ModelStore.download(invalid, to: dir) { status in
-                            Task { @MainActor in self.showDownload(status) }
-                        }
-                        log.info("model downloaded in \(ContinuousClock.now - downloadStart, privacy: .public)")
-                    } catch {
-                        // The domain and code, not the description, which can carry the user's path.
-                        let code = (error as NSError).code, domain = (error as NSError).domain
-                        log.error("model download failed: \(String(describing: type(of: error)), privacy: .public) \(domain, privacy: .public) \(code, privacy: .public)")
-                        await self.modelDidLoad(nil)
-                        return
+            let checkStart = ContinuousClock.now
+            let invalid = hashing ? ModelStore.invalidFiles(in: dir) : ModelStore.missingFiles(in: dir)
+            log.info("model checked in \(ContinuousClock.now - checkStart, privacy: .public), \(invalid.count, privacy: .public) files to download")
+            if !invalid.isEmpty {
+                await self.handle(.downloadStarted)
+                let downloadStart = ContinuousClock.now
+                do {
+                    try await ModelStore.download(invalid, to: dir) { status in
+                        // FIFO, unlike one Task per update: the percent never goes backwards.
+                        DispatchQueue.main.async { MainActor.assumeIsolated { self.showDownload(status) } }
                     }
+                    log.info("model downloaded in \(ContinuousClock.now - downloadStart, privacy: .public)")
+                } catch {
+                    // The domain and code, not the description, which can carry the user's path.
+                    let code = (error as NSError).code, domain = (error as NSError).domain
+                    log.error("model download failed: \(String(describing: type(of: error)), privacy: .public) \(domain, privacy: .public) \(code, privacy: .public)")
+                    await self.modelDidLoad(nil)
+                    return
                 }
             }
             let start = ContinuousClock.now
@@ -124,8 +123,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             log.info("reloading the model to give its RAM back")
             // Destroy before loading: both recognizers at once would peak at ~2.4 GB.
             transcriber = nil
-            prepareModel(verify: false)
-        case .prepareModel: prepareModel(verify: true)
+            prepareModel(hashing: false)
+        // Retry hashes: a same-size corrupt file passes the size check and would fail again.
+        case .prepareModel: prepareModel(hashing: true)
         case .alertRecordingLimit:
             log.info("recording limit reached")
             NSSound(named: "Tink")?.play()
@@ -201,7 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         modelItem.isHidden = state.model != .unavailable && state.model != .downloading
         let failed = state.model == .unavailable
         modelItem.action = failed ? #selector(retry) : nil
-        if failed { modelItem.title = "Model download failed. Retry" }
+        if failed { modelItem.title = "Model unavailable. Retry" }
     }
 }
 

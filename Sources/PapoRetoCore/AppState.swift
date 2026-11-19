@@ -15,7 +15,7 @@ public enum AppEvent: Sendable, Equatable {
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
     case startRecording, stopRecording, discardRecording, transcribe, reloadModel, alertRecordingLimit
-    /// Check every file's size, download what fails, then load.
+    /// Check every file's SHA-256 (Retry: the launch checks sizes), download what fails, then load.
     case prepareModel
 }
 

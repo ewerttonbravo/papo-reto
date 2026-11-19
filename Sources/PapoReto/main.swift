@@ -44,13 +44,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         prepareModel(verify: true)
     }
 
-    /// `verify` checks every file's SHA-256 and downloads the ones that fail; the reload after a long audio skips it.
+    /// `verify` checks every file's size and downloads the ones that fail; the reload after a long audio skips it.
     private func prepareModel(verify: Bool) {
         Task.detached(priority: .userInitiated) {
             let dir = Transcriber.defaultModelDir
             if verify {
                 let checkStart = ContinuousClock.now
-                let invalid = ModelStore.invalidFiles(in: dir)
+                let invalid = ModelStore.missingFiles(in: dir)
                 log.info("model checked in \(ContinuousClock.now - checkStart, privacy: .public), \(invalid.count, privacy: .public) files to download")
                 if !invalid.isEmpty {
                     await self.handle(.downloadStarted)

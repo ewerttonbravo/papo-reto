@@ -2,7 +2,7 @@ public enum AppEvent: Sendable, Equatable {
     /// Any key down. Recording means Fn is held, so any key cancels; hands-free only Esc (ADR-005).
     case keyPressed(isEscape: Bool)
     case modelLoaded, modelFailed, recordingLimitReached
-    /// A model file is absent or fails its SHA-256: the adapter downloads it, then loads.
+    /// A model file is absent or truncated: the adapter downloads it, verifies its SHA-256, then loads.
     case downloadStarted
     /// The menu's Retry after a failed download or load.
     case retryRequested
@@ -15,7 +15,7 @@ public enum AppEvent: Sendable, Equatable {
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
     case startRecording, stopRecording, discardRecording, transcribe, reloadModel, alertRecordingLimit
-    /// Check every file's SHA-256, download what fails, then load.
+    /// Check every file's size, download what fails, then load.
     case prepareModel
 }
 

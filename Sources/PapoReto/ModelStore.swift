@@ -2,13 +2,16 @@ import CryptoKit
 import Foundation
 import PapoRetoCore
 
-/// Checks the model files by SHA-256 and downloads the ones that fail: the app's only network use (ADR-002).
+/// Checks the model files and downloads the ones missing, verifying each by SHA-256: the app's only network use (ADR-002).
 enum ModelStore {
     struct ChecksumMismatch: Error { let file: String }
 
-    /// Off the main thread: hashing the encoder takes ~1 s.
-    static func invalidFiles(in dir: URL) -> [ModelFile] {
-        ParakeetModel.files.filter { !$0.isValid(sha256: sha256(of: dir.appendingPathComponent($0.name))) }
+    /// Absent or truncated files. By size, not hash: hashing the encoder takes 2.3-2.6 s on the reference Mac.
+    static func missingFiles(in dir: URL) -> [ModelFile] {
+        ParakeetModel.files.filter { file in
+            let size = try? FileManager.default.attributesOfItem(atPath: dir.appendingPathComponent(file.name).path)[.size] as? Int64
+            return !file.isComplete(bytes: size)
+        }
     }
 
     /// Each file goes to `<name>.part` and is renamed only after its hash matches; an interrupted file starts over.

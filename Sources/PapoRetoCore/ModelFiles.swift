@@ -6,8 +6,11 @@ public struct ModelFile: Sendable, Equatable {
     public let sha256: String
     public let bytes: Int64
 
-    /// nil means the file is absent.
+    /// nil means the file is absent. Checked after each download.
     public func isValid(sha256 digest: String?) -> Bool { digest == sha256 }
+
+    /// The launch check: hashing the encoder there costs 2.3-2.6 s on the reference Mac. nil means absent.
+    public func isComplete(bytes size: Int64?) -> Bool { size == bytes }
 }
 
 /// Parakeet TDT 0.6B v3 int8; scripts/fetch-deps.sh pins the same files for the bench.

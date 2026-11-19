@@ -15,7 +15,13 @@ The app is not notarized by Apple, so macOS blocks its first launch. Open it onc
 xattr -dr com.apple.quarantine /Applications/PapoReto.app
 ```
 
-Each new version asks for Accessibility and the Microphone again, since macOS ties them to the app's signature and the prebuilt app is signed ad-hoc. If `Fn` does nothing after an update, remove Papo Reto from System Settings → Privacy & Security → Accessibility and add it again.
+macOS ties the permissions to the app's signature, and the prebuilt app is signed ad-hoc, so each new version counts as a new app. The Microphone is asked again; Accessibility is not: the old approval still shows as on but no longer applies, and `Fn` does nothing. After each update, quit Papo Reto and run:
+
+```sh
+tccutil reset Accessibility io.github.ewerttonbravo.papo-reto
+```
+
+Then open the app, allow Accessibility and reopen it.
 
 ## Build and run
 Requires macOS 13+ and the Command Line Tools (`xcode-select --install`) or Xcode.

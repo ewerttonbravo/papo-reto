@@ -27,5 +27,5 @@ public enum ParakeetModel {
 
 /// Truncated, so the menu never shows 100% before the last byte.
 public func downloadStatus(received: Int64, total: Int64) -> String {
-    String(format: "Downloading model: %lld%% of %.0f MB", received * 100 / max(total, 1), Double(total) / 1_000_000)
+    String(format: "Downloading model: %lld%% of %.0f MB", min(received, total) * 100 / max(total, 1), Double(total) / 1_000_000)
 }

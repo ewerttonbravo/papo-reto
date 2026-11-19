@@ -86,9 +86,13 @@ INSTALL_DIR ?= /Applications
 # Also quits a make run instance: two event taps would paste every dictation twice.
 .PHONY: install
 install: app
-	@pkill -x PapoReto && echo "Quitting the running Papo Reto"; \
-	for i in $$(seq 50); do pgrep -x PapoReto >/dev/null || exit 0; sleep 0.1; done; \
+	@# Copied aside first, so a failed copy keeps the installed app.
+	rm -rf "$(INSTALL_DIR)/.PapoReto.app.tmp"
+	ditto build/PapoReto.app "$(INSTALL_DIR)/.PapoReto.app.tmp"
+	@# Only this user's instance: another logged-in user's cannot be signalled and does not block.
+	@pkill -u "$$(id -u)" -x PapoReto && echo "Quitting the running Papo Reto"; \
+	for i in $$(seq 50); do pgrep -u "$$(id -u)" -x PapoReto >/dev/null || exit 0; sleep 0.1; done; \
 	echo "Papo Reto did not quit; quit it from the menu bar and run make install again"; exit 1
 	rm -rf "$(INSTALL_DIR)/PapoReto.app"
-	ditto build/PapoReto.app "$(INSTALL_DIR)/PapoReto.app"
+	mv "$(INSTALL_DIR)/.PapoReto.app.tmp" "$(INSTALL_DIR)/PapoReto.app"
 	open "$(INSTALL_DIR)/PapoReto.app"

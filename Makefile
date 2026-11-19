@@ -12,6 +12,8 @@ SHERPA_ARCH := $(if $(filter x86_64,$(ARCH)),x64,arm64)
 SHERPA_LIB := vendor/sherpa-onnx/lib/.$(SHERPA_ARCH)
 
 VAD_MODEL := vendor/silero-vad/silero_vad.onnx
+# Fetched last; vendor/notices/ also holds the sherpa-onnx LICENSE.
+ORT_NOTICES := vendor/notices/onnxruntime-ThirdPartyNotices.txt
 # What the app loads; the cxx-api stays out.
 BUNDLED_LIBS := $(addprefix vendor/sherpa-onnx/lib/,libsherpa-onnx-c-api.dylib libonnxruntime.dylib)
 
@@ -20,6 +22,9 @@ $(SHERPA_LIB): scripts/fetch-deps.sh
 	ARCH=$(ARCH) scripts/fetch-deps.sh libs
 	@touch $@
 $(VAD_MODEL): $(SHERPA_LIB)
+	ARCH=$(ARCH) scripts/fetch-deps.sh libs
+	@touch $@
+$(ORT_NOTICES): $(VAD_MODEL)
 	ARCH=$(ARCH) scripts/fetch-deps.sh libs
 	@touch $@
 
@@ -62,14 +67,14 @@ DEV_CERT ?= Papo Reto Dev
 SIGN ?=
 
 .PHONY: app run
-app: $(SHERPA_LIB) $(VAD_MODEL)
+app: $(SHERPA_LIB) $(VAD_MODEL) $(ORT_NOTICES)
 	swift build -c release --arch $(ARCH) --product PapoReto
 	rm -rf build/PapoReto.app
 	mkdir -p build/PapoReto.app/Contents/MacOS
 	cp "$$(swift build -c release --arch $(ARCH) --show-bin-path)/PapoReto" build/PapoReto.app/Contents/MacOS/
 	cp Resources/Info.plist build/PapoReto.app/Contents/
 	mkdir -p build/PapoReto.app/Contents/Resources
-	cp $(VAD_MODEL) build/PapoReto.app/Contents/Resources/
+	cp $(VAD_MODEL) THIRD_PARTY_NOTICES.md vendor/notices/*.txt build/PapoReto.app/Contents/Resources/
 	mkdir -p build/PapoReto.app/Contents/Frameworks
 	cp $(BUNDLED_LIBS) build/PapoReto.app/Contents/Frameworks/
 	@# The repo's vendor/ rpath would hide a broken bundle on this Mac.
@@ -90,6 +95,7 @@ NATIVE_ARCH := $(shell uname -m)
 OTHER_ARCH := $(if $(filter x86_64,$(NATIVE_ARCH)),arm64,x86_64)
 
 # Ad-hoc, one zip per architecture (ADR-006); this Mac's last, so vendor/ ends with its libs.
+# No xattrs in the zip: com.apple.provenance is this Mac's; the signature lives in the files.
 .PHONY: release
 release:
 	rm -rf build/release
@@ -97,7 +103,7 @@ release:
 	@for arch in $(OTHER_ARCH) $(NATIVE_ARCH); do \
 		zip=build/release/PapoReto-$(VERSION)-$$arch.zip; \
 		$(MAKE) app ARCH=$$arch SIGN=- && \
-		ditto -c -k --keepParent build/PapoReto.app $$zip && \
+		ditto -c -k --norsrc --noextattr --noacl --keepParent build/PapoReto.app $$zip && \
 		scripts/check-release.sh $$zip && echo "$$zip: $$(du -sh build/PapoReto.app | cut -f1) app" || exit 1; \
 	done
 

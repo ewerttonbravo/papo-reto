@@ -35,7 +35,7 @@ public struct AppState: Sendable, Equatable {
     public static let minimumAudio = Duration.milliseconds(400)
 
     public static func isLongEnough(sampleCount: Int, sampleRate: Int) -> Bool {
-        .milliseconds(sampleCount * 1000) / sampleRate >= minimumAudio
+        .seconds(sampleCount) / sampleRate >= minimumAudio
     }
 
     public var model: Model

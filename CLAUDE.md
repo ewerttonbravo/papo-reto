@@ -72,7 +72,7 @@ The compiler prevents the Core from importing the app. Every state transition go
 - CI (GitHub Actions, macOS): `make test`.
 
 ## Commands
-`make test` · `make test FILTER=<Test>` (one test, no coverage; with the CLT, plain `swift test` cannot find Swift Testing) · `make app` (assembles and signs the `.app`) · `make run` · `make bench` (real WAVs from `BENCH_AUDIO`, default `../papo-reto-docs/bench/audio`). To be created: `make install` (T09), `make release` (T10).
+`make test` · `make test FILTER=<Test>` (one test, no coverage; with the CLT, plain `swift test` cannot find Swift Testing) · `make app` (assembles the `.app` with the sherpa dylibs in `Contents/Frameworks`, swaps the `vendor/` rpath for it, signs and runs `scripts/check-bundle.sh`) · `make run` · `make install` (quits a running instance, copies to `/Applications` and opens) · `make bench` (real WAVs from `BENCH_AUDIO`, default `../papo-reto-docs/bench/audio`). To be created: `make release` (T10).
 
 ## Conventions
 - Everything in this repo is in English: code, names, comments, UI, README, commits and PRs. `../papo-reto-docs` stays in PT-BR.

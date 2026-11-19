@@ -2,7 +2,7 @@
 import Foundation
 import PackageDescription
 
-// Fetched by scripts/fetch-deps.sh libs; the .app will bundle them in T09.
+// Fetched by scripts/fetch-deps.sh libs; make app copies them into the .app and swaps this rpath for its Frameworks.
 let sherpaLib = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
     .appendingPathComponent("vendor/sherpa-onnx/lib").path
 

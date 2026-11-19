@@ -4,7 +4,7 @@ Voice dictation for macOS, focused on Brazilian Portuguese (PT-BR), 100% local. 
 
 In development: holding `Fn` for more than 300 ms records the microphone chosen in the menu bar (Microphone → System Default or a device; the choice is saved, and while that device is unplugged the system default records), and on release the transcribed text is pasted at the cursor with Cmd+V. Your previous clipboard comes back 250 ms later, except a password from a password manager, which is left out. Clipboard managers that honor `org.nspasteboard.TransientType` skip the dictation. With no text field in focus, the dictation is lost. For longer dictation, double-tap `Fn` (second press within 400 ms of releasing the first) to record hands-free; the next `Fn` press stops and pastes. `Esc`, or any key pressed while `Fn` is held (arrows, F1-F12), cancels the recording and nothing is pasted; the `Esc` still reaches the focused app. A recording stops by itself at 2 minutes, with a sound, and is transcribed whole. After a long dictation (from ~20 s) the model reloads to give its memory back (hourglass icon for a few seconds); a press while the model is loading is transcribed once it is ready.
 
-The first launch asks for Accessibility (to read the `Fn` key and send Cmd+V; grant it and reopen the app) and, on the first dictation, for the Microphone. Set System Settings → Keyboard → "Press 🌐 key to" → "Do Nothing", or macOS also acts on `Fn`.
+The first launch asks for Accessibility (to read the `Fn` key and send Cmd+V; `Fn` works as soon as you grant it) and, on the first dictation, for the Microphone. Until Accessibility is granted, the menu's "Allow Accessibility…" opens its settings. Set System Settings → Keyboard → "Press 🌐 key to" → "Do Nothing", or macOS also acts on `Fn`.
 
 ## Install
 Building from source (below) is the recommended path. To use a prebuilt app, download from [Releases](https://github.com/ewerttonbravo/papo-reto/releases) the zip for your Mac: `arm64` for Apple silicon (M1 and later), `x86_64` for Intel (Apple menu → About This Mac). Unzip it and move `PapoReto.app` to Applications. Requires macOS 13+.
@@ -15,13 +15,7 @@ The app is not notarized by Apple, so macOS blocks its first launch. Open it onc
 xattr -dr com.apple.quarantine /Applications/PapoReto.app
 ```
 
-macOS ties the permissions to the app's signature, and the prebuilt app is signed ad-hoc, so each new version counts as a new app. The Microphone is asked again; Accessibility is not: the old approval still shows as on but no longer applies, and `Fn` does nothing. After each update, quit Papo Reto and run:
-
-```sh
-tccutil reset Accessibility io.github.ewerttonbravo.papo-reto
-```
-
-Then open the app, allow Accessibility and reopen it.
+macOS ties the permissions to the app's signature, and the prebuilt app is signed ad-hoc, so each new version counts as a new app and asks for Accessibility and the Microphone again; the app clears its old Accessibility record itself.
 
 ## Build and run
 Requires macOS 13+ and the Command Line Tools (`xcode-select --install`) or Xcode.

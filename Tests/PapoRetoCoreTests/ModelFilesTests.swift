@@ -15,6 +15,16 @@ private let decoder = ParakeetModel.files[1]
     #expect(!encoder.isValid(sha256: decoder.sha256))
 }
 
+@Test func fileOfTheManifestSizeIsComplete() {
+    #expect(encoder.isComplete(bytes: encoder.bytes))
+}
+
+/// The launch check: a truncated file (what makes sherpa abort) or one grown by an append fails it.
+@Test(arguments: [nil, encoder.bytes - 1, encoder.bytes + 1])
+func absentOrDifferentSizeIsIncomplete(bytes: Int64?) {
+    #expect(!encoder.isComplete(bytes: bytes))
+}
+
 @Test func manifestTotalsTheModelSize() {
     #expect(ParakeetModel.files.map(\.name) == ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"])
     #expect(ParakeetModel.bytes == 670_576_784)

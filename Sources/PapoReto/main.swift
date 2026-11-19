@@ -19,12 +19,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let modelItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let microphoneMenu = NSMenu()
     private let accessibilityItem = NSMenuItem(
-        title: "Allow Accessibility in System Settings, then reopen Papo Reto", action: nil, keyEquivalent: "")
+        title: "Allow Accessibility…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+    private var accessibilityObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
         modelItem.target = self
+        accessibilityItem.target = self
+        menu.delegate = self
         menu.addItem(modelItem)
         menu.addItem(accessibilityItem)
         let microphoneItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
@@ -61,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
 
+    /// Retried when the Accessibility list changes and when the menu opens, so granting needs no reopening.
     private func startFnMonitor() {
         guard fnMonitor == nil else { return }
         fnMonitor = FnKeyMonitor(
@@ -68,6 +72,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) },
             onKey: { [weak self] isEscape in self?.handle(.keyPressed(isEscape: isEscape)) })
         accessibilityItem.isHidden = fnMonitor != nil
+        if fnMonitor != nil {
+            accessibilityObserver.map(DistributedNotificationCenter.default().removeObserver)
+            accessibilityObserver = nil
+        } else if accessibilityObserver == nil {
+            // Undocumented, posted on any change to the list: no polling while the permission is missing.
+            accessibilityObserver = DistributedNotificationCenter.default().addObserver(
+                forName: Notification.Name("com.apple.accessibility.api"), object: nil, queue: .main
+            ) { _ in
+                MainActor.assumeIsolated {
+                    log.info("accessibility list changed, trusted: \(AXIsProcessTrusted(), privacy: .public)")
+                    self.startFnMonitor()
+                }
+            }
+        }
+    }
+
+    @objc private func openAccessibilitySettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
     /// Checks every file (by size; by SHA-256 when `hashing`), downloads the ones that fail, then loads.
@@ -222,8 +244,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return devices.first { $0.uid == uid }
     }
 
+    /// The main menu: a fallback should the Accessibility notification not arrive.
+    func menuWillOpen(_ menu: NSMenu) {
+        if menu !== microphoneMenu { startFnMonitor() }
+    }
+
     /// Rebuilt on each opening, so a device plugged in meanwhile shows up without polling.
     func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === microphoneMenu else { return }
         let devices = AudioDevices.inputs()
         let inUse = currentMicrophone(among: devices)?.uid
         menu.removeAllItems()

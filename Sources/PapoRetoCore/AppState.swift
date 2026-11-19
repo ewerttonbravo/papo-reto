@@ -19,6 +19,9 @@ public enum AppEffect: Sendable, Equatable {
     case prepareModel
 }
 
+/// Whether a recording goes to the model; the model makes words up for slips and noise ("Yeah." from a Tink).
+public enum AudioVerdict: Sendable, Equatable { case transcribe, tooShort, noSpeech }
+
 public struct AppState: Sendable, Equatable {
     public enum Model: Sendable { case loading, downloading, ready, unavailable }
     public enum Activity: Sendable { case idle, recording, handsFree, transcribing }
@@ -36,6 +39,12 @@ public struct AppState: Sendable, Equatable {
 
     public static func isLongEnough(sampleCount: Int, sampleRate: Int) -> Bool {
         .seconds(sampleCount) / sampleRate >= minimumAudio
+    }
+
+    /// Short audio skips the detector too. A nil detector (no file in the bundle) transcribes: never lose a dictation.
+    public static func audioVerdict(sampleCount: Int, sampleRate: Int, containsSpeech: (() -> Bool)?) -> AudioVerdict {
+        guard isLongEnough(sampleCount: sampleCount, sampleRate: sampleRate) else { return .tooShort }
+        return containsSpeech?() == false ? .noSpeech : .transcribe
     }
 
     public var model: Model

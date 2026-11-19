@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) },
             onKey: { [weak self] isEscape in self?.handle(.keyPressed(isEscape: isEscape)) })
         accessibilityItem.isHidden = fnMonitor != nil
+        if Self.detectorModel == nil { log.error("no speech detector bundled: silence goes to the model") }
         render()
         prepareModel(hashing: false)
     }
@@ -139,9 +140,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         pendingSamples = []
         let work = Task.detached(priority: .userInitiated) {
             let seconds = Double(samples.count) / 16000
+            let check = ContinuousClock.now
+            let verdict = AppState.audioVerdict(sampleCount: samples.count, sampleRate: 16000,
+                                                containsSpeech: Self.detectorModel.map { model in { Self.containsSpeech(samples, model: model) } })
             // An empty text pastes nothing and still ends in `.transcribed`, back to idle.
-            guard AppState.isLongEnough(sampleCount: samples.count, sampleRate: 16000) else {
-                log.info("skipped \(seconds, format: .fixed(precision: 2), privacy: .public) s of audio: too short")
+            guard verdict == .transcribe else {
+                log.info("skipped \(seconds, format: .fixed(precision: 2), privacy: .public) s of audio: \(String(describing: verdict), privacy: .public), checked in \(ContinuousClock.now - check, privacy: .public)")
                 return ("", processMemory().footprint)
             }
             let start = ContinuousClock.now
@@ -155,6 +159,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let (text, footprint) = await work.value
             didTranscribe(text, footprintMB: footprint)
         }
+    }
+
+    /// Bundled by `make app` (ADR-020); nil under `swift run`, which then transcribes everything.
+    private nonisolated static let detectorModel = Bundle.main.url(forResource: "silero_vad", withExtension: "onnx")
+
+    /// Created per dictation and freed on return: no RAM at rest (ADR-020). A detector that fails says speech.
+    private nonisolated static func containsSpeech(_ samples: [Float], model: URL) -> Bool {
+        let start = ContinuousClock.now
+        guard let detector = SpeechDetector(model: model) else {
+            log.error("speech detector failed to load, transcribing anyway")
+            return true
+        }
+        let found = detector.containsSpeech(samples)
+        if found { log.info("speech found in \(ContinuousClock.now - start, privacy: .public)") }
+        return found
     }
 
     private func didTranscribe(_ transcription: String, footprintMB: Double) {

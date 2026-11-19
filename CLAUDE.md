@@ -28,14 +28,14 @@ MVP: menu bar (no Dock, no window), icon per state (loading / ready / recording 
 - Automatic via `.claude/hooks/curadoria.sh`: injects the state at session start and forces the check at the end of a turn with uncommitted changes (at most once every 30 min).
 
 ## Stack
-Swift 6 · AppKit · SwiftPM (no Xcode project, no SwiftUI, no third-party Swift dependencies) · Swift Testing · sherpa-onnx (C API, prebuilt libs pinned by SHA-256) · Parakeet TDT 0.6B v3 int8 (ADR-003) · macOS 13+ · per-architecture release (ADR-006).
+Swift 6 · AppKit · SwiftPM (no Xcode project, no SwiftUI, no third-party Swift dependencies) · Swift Testing · sherpa-onnx (C API, prebuilt libs pinned by SHA-256) · Parakeet TDT 0.6B v3 int8 (ADR-003) · Silero VAD bundled in the `.app` (ADR-020) · macOS 13+ · per-architecture release (ADR-006).
 
 ## Architecture
 | Target | Contents | May import |
 |---|---|---|
 | `PapoRetoCore` | Pure logic: state machine, `Fn` gesture (injected clock), silence discarding, SHA-256 verification, final text, ports (protocols) | Foundation only |
 | `PapoReto` | App + thin adapters: `StatusMenu`, `FnKeyMonitor` (CGEventTap), `AudioRecorder` (AVAudioEngine), `AudioDevices` (Core Audio), `ModelStore` (download), `Paster` | anything + Core |
-| `PapoRetoSherpa` | `Transcriber` (sherpa), shared by the app and the bench | `CSherpaOnnx` |
+| `PapoRetoSherpa` | `Transcriber` (sherpa), shared by the app and the bench; `SpeechDetector` (Silero VAD) | `CSherpaOnnx` |
 | `papo-reto-bench` | CLI: text, latency and RAM per WAV, budget verdict | `PapoRetoCore`, `PapoRetoSherpa`, `CSherpaOnnx` (WAV reader) |
 | `CSherpaOnnx` | module map for `vendor/sherpa-onnx/include/c-api.h` | — |
 
@@ -43,7 +43,7 @@ The compiler prevents the Core from importing the app. Every state transition go
 
 ## Known pitfalls
 - **Model:** loads in the background when the app opens; reuse the `OfflineRecognizer` and create one stream per transcription; when the footprint after a transcription reaches 900 MB the app destroys it and loads a new one (destroy first: both at once peak at ~2.4 GB), since it keeps the RAM of the longest audio it saw (app: 28.5 s → 1,005 MB); `num_threads` = `hw.physicalcpu`. Files in `~/Library/Application Support/PapoReto/Models/parakeet-tdt-0.6b-v3-int8/`; the app downloads missing or truncated files (`ModelStore`, manifest in the Core) and the bench gets them from `scripts/fetch-deps.sh model` (same SHA-256 pins, kept in both). The launch checks sizes only: CryptoKit/CommonCrypto skip the Intel SHA instructions, so hashing the encoder takes 2.3-2.6 s (openssl: ~1 s); the SHA-256 runs after each download and on Retry (a same-size corrupt file would fail again). An `Fn` press before a load finishes records normally and transcribes when the model is ready. Recording stops by itself at 2 min (sound + transcribes it whole). After each load the app calls `malloc_zone_pressure_relief(nil, 0)` (609-692 → 450 MB); not in `Transcriber`, where it pushed the bench to 899 MB (ADR-012).
-- **Audio:** the engine runs only while recording. The microphone is selected with `kAudioOutputUnitProperty_CurrentDevice` and persisted by UID, falling back to the default if the device disappears. Convert to 16 kHz mono Float32 in memory, never on disk. Measure hands-free with 2 min of speech before deciding on VAD. Recorded audio < 0.4 s skips the model (it makes words up: 0.35 s → "It was").
+- **Audio:** the engine runs only while recording. The microphone is selected with `kAudioOutputUnitProperty_CurrentDevice` and persisted by UID, falling back to the default if the device disappears. Convert to 16 kHz mono Float32 in memory, never on disk. Recorded audio < 0.4 s skips the model (it makes words up: 0.35 s → "It was"); longer audio goes to the model only if the Silero VAD finds speech (noise → "Yeah."). The detector is created per dictation (~50 ms, no RAM at rest) and stops at the first speech; without it (`swift run`) everything is transcribed.
 - **Fn:** CGEventTap on `flagsChanged` + `keyDown` (`.maskSecondaryFn`). Start recording on keydown and discard if it was a short tap. Fn+key cancels: the Core decides from `keyPressed(isEscape:)` (recording means Fn is held; arrows and F-keys carry `.maskSecondaryFn` without Fn); with standard F-keys on, Fn+F1 arrives as a media key (NX_SYSDEFINED). Time Fn from `NSEvent.timestamp`: handling runs late after a cold microphone start, and the raw CGEvent unit differs on Apple Silicon. Double tap = second press < 400 ms after the tap's release. Re-enable after `tapDisabledByTimeout`. Tell the user: "Press 🌐 key to" ("Pressionar tecla 🌐 para") → "Do Nothing" ("Não fazer nada").
 - **Paste:** save the whole pasteboard, write with `org.nspasteboard.TransientType`, send Cmd+V via CGEvent and restore after ~250 ms.
 - **Permissions:** TCC ties the permission to the signature. Ad-hoc resets on every build, so development uses the self-signed certificate "Papo Reto Dev" (ADR-006).

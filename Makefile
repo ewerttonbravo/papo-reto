@@ -9,8 +9,15 @@ endif
 SHERPA_ARCH := $(if $(filter x86_64,$(shell uname -m)),x64,arm64)
 SHERPA_LIB := vendor/sherpa-onnx/lib/.$(SHERPA_ARCH)
 
+VAD_MODEL := vendor/silero-vad/silero_vad.onnx
+
+# One rule after the other, never two fetches at once (make -j); touch, since fetch skips files it has.
 $(SHERPA_LIB): scripts/fetch-deps.sh
 	scripts/fetch-deps.sh libs
+	@touch $@
+$(VAD_MODEL): $(SHERPA_LIB)
+	scripts/fetch-deps.sh libs
+	@touch $@
 
 .PHONY: test
 test: $(SHERPA_LIB)
@@ -49,12 +56,14 @@ bench: $(SHERPA_LIB)
 DEV_CERT ?= Papo Reto Dev
 
 .PHONY: app run
-app: $(SHERPA_LIB)
+app: $(SHERPA_LIB) $(VAD_MODEL)
 	swift build -c release --product PapoReto
 	rm -rf build/PapoReto.app
 	mkdir -p build/PapoReto.app/Contents/MacOS
 	cp "$$(swift build -c release --show-bin-path)/PapoReto" build/PapoReto.app/Contents/MacOS/
 	cp Resources/Info.plist build/PapoReto.app/Contents/
+	mkdir -p build/PapoReto.app/Contents/Resources
+	cp $(VAD_MODEL) build/PapoReto.app/Contents/Resources/
 	@ID=$$(DEV_CERT='$(DEV_CERT)' scripts/dev-cert.sh --identity); \
 	if [ -n "$$ID" ]; then echo "Signing with \"$(DEV_CERT)\" ($$ID)"; \
 	else ID=-; echo "Signing ad-hoc: no \"$(DEV_CERT)\" identity, so TCC permissions reset (run scripts/dev-cert.sh)"; fi; \

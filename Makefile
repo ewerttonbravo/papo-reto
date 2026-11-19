@@ -10,6 +10,8 @@ SHERPA_ARCH := $(if $(filter x86_64,$(shell uname -m)),x64,arm64)
 SHERPA_LIB := vendor/sherpa-onnx/lib/.$(SHERPA_ARCH)
 
 VAD_MODEL := vendor/silero-vad/silero_vad.onnx
+# What the app loads; the cxx-api stays out.
+BUNDLED_LIBS := $(addprefix vendor/sherpa-onnx/lib/,libsherpa-onnx-c-api.dylib libonnxruntime.dylib)
 
 # One rule after the other, never two fetches at once (make -j); touch, since fetch skips files it has.
 $(SHERPA_LIB): scripts/fetch-deps.sh
@@ -64,10 +66,33 @@ app: $(SHERPA_LIB) $(VAD_MODEL)
 	cp Resources/Info.plist build/PapoReto.app/Contents/
 	mkdir -p build/PapoReto.app/Contents/Resources
 	cp $(VAD_MODEL) build/PapoReto.app/Contents/Resources/
+	mkdir -p build/PapoReto.app/Contents/Frameworks
+	cp $(BUNDLED_LIBS) build/PapoReto.app/Contents/Frameworks/
+	@# The repo's vendor/ rpath would hide a broken bundle on this Mac.
+	install_name_tool -delete_rpath "$(CURDIR)/vendor/sherpa-onnx/lib" \
+		-add_rpath @executable_path/../Frameworks build/PapoReto.app/Contents/MacOS/PapoReto
 	@ID=$$(DEV_CERT='$(DEV_CERT)' scripts/dev-cert.sh --identity); \
 	if [ -n "$$ID" ]; then echo "Signing with \"$(DEV_CERT)\" ($$ID)"; \
 	else ID=-; echo "Signing ad-hoc: no \"$(DEV_CERT)\" identity, so TCC permissions reset (run scripts/dev-cert.sh)"; fi; \
+	codesign --force --sign "$$ID" build/PapoReto.app/Contents/Frameworks/*.dylib && \
 	codesign --force --sign "$$ID" build/PapoReto.app
+	scripts/check-bundle.sh build/PapoReto.app
 
 run: app
 	open build/PapoReto.app
+
+INSTALL_DIR ?= /Applications
+
+# Also quits a make run instance: two event taps would paste every dictation twice.
+.PHONY: install
+install: app
+	@# Copied aside first, so a failed copy keeps the installed app.
+	rm -rf "$(INSTALL_DIR)/.PapoReto.app.tmp"
+	ditto build/PapoReto.app "$(INSTALL_DIR)/.PapoReto.app.tmp"
+	@# Only this user's instance: another logged-in user's cannot be signalled and does not block.
+	@pkill -u "$$(id -u)" -x PapoReto && echo "Quitting the running Papo Reto"; \
+	for i in $$(seq 50); do pgrep -u "$$(id -u)" -x PapoReto >/dev/null || exit 0; sleep 0.1; done; \
+	echo "Papo Reto did not quit; quit it from the menu bar and run make install again"; exit 1
+	rm -rf "$(INSTALL_DIR)/PapoReto.app"
+	mv "$(INSTALL_DIR)/.PapoReto.app.tmp" "$(INSTALL_DIR)/PapoReto.app"
+	open "$(INSTALL_DIR)/PapoReto.app"

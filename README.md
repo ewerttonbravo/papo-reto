@@ -12,11 +12,12 @@ Requires macOS 13+ and the Command Line Tools (`xcode-select --install`) or Xcod
 ```sh
 make test   # tests + 100% line coverage on PapoRetoCore
 scripts/fetch-deps.sh model  # Parakeet TDT 0.6B v3 int8 (~670 MB, SHA-256 checked) for the bench; the app downloads it itself
+make install  # builds the app and installs it in /Applications, quitting and reopening a running one
 make app    # builds build/PapoReto.app for local use
 make run    # builds and opens the app
 ```
 
-Optional, once per Mac: `scripts/dev-cert.sh` creates a free self-signed certificate, "Papo Reto Dev", in your login keychain (macOS asks for your password to trust it for code signing). `make app` then signs with it, and the Microphone and Accessibility permissions survive rebuilds. Without it, `make app` signs ad-hoc and macOS asks for them again after each build.
+Optional, once per Mac: `scripts/dev-cert.sh` creates a free self-signed certificate, "Papo Reto Dev", in your login keychain (macOS asks for your password to trust it for code signing). `make app` and `make install` then sign with it, and the Microphone and Accessibility permissions survive rebuilds. Without it, they sign ad-hoc and macOS asks for them again after each build.
 
 On the first launch the app downloads the model (671 MB, from Hugging Face, the only network use) with the progress in the menu, and checks each file's SHA-256. At every launch it checks the file sizes and downloads again any file that is missing or truncated; an interrupted file starts over. If the download fails, the menu offers Retry. `make test` and `make app` download the prebuilt [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) libs into `vendor/`, checking their SHA-256.
 

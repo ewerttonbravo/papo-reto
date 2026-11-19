@@ -30,7 +30,8 @@ func absentOrDifferentSizeIsIncomplete(bytes: Int64?) {
     #expect(ParakeetModel.bytes == 670_576_784)
 }
 
-@Test(arguments: [(Int64(0), "0%"), (ParakeetModel.bytes - 1, "99%"), (ParakeetModel.bytes, "100%")])
+/// A body longer than the manifest (wrong revision) fails its hash later; the menu still stops at 100%.
+@Test(arguments: [(Int64(0), "0%"), (ParakeetModel.bytes - 1, "99%"), (ParakeetModel.bytes, "100%"), (ParakeetModel.bytes * 2, "100%")])
 func downloadStatusTruncatesThePercent(received: Int64, percent: String) {
     #expect(downloadStatus(received: received, total: ParakeetModel.bytes) == "Downloading model: \(percent) of 671 MB")
 }

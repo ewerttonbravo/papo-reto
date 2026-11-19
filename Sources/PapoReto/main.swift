@@ -138,9 +138,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let samples = pendingSamples
         pendingSamples = []
         let work = Task.detached(priority: .userInitiated) {
+            let seconds = Double(samples.count) / 16000
+            // An empty text pastes nothing and still ends in `.transcribed`, back to idle.
+            guard AppState.isLongEnough(sampleCount: samples.count, sampleRate: 16000) else {
+                log.info("skipped \(seconds, format: .fixed(precision: 2), privacy: .public) s of audio: too short")
+                return ("", processMemory().footprint)
+            }
             let start = ContinuousClock.now
             let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
-            let seconds = Double(samples.count) / 16000
             let footprint = processMemory().footprint
             log.info("transcribed \(seconds, format: .fixed(precision: 1), privacy: .public) s of audio in \(ContinuousClock.now - start, privacy: .public), footprint \(footprint, format: .fixed(precision: 0), privacy: .public) MB")
             return (text, footprint)

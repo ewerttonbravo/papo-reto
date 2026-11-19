@@ -31,6 +31,12 @@ public struct AppState: Sendable, Equatable {
     public static let reloadAtFootprintMB = BenchBudget.reference.maxFootprintMB
     /// A recording stops by itself here and is transcribed whole, which bounds the RAM peak.
     public static let recordingLimit = Duration.seconds(120)
+    /// Shorter audio is a slip, not dictation, and the model makes words up for it (0.35 s → "It was").
+    public static let minimumAudio = Duration.milliseconds(400)
+
+    public static func isLongEnough(sampleCount: Int, sampleRate: Int) -> Bool {
+        .seconds(sampleCount) / sampleRate >= minimumAudio
+    }
 
     public var model: Model
     public var activity: Activity

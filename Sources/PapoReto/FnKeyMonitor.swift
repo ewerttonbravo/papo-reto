@@ -22,12 +22,10 @@ final class FnKeyMonitor {
     private var pressedAt: TimeInterval?
     private var releasedAt: TimeInterval?
 
-    /// Nil without Accessibility; the system prompt asks for it once.
+    /// Nil without Accessibility. Never prompts: it is retried each time the permission may have changed.
     init?(onPress: @escaping (Duration?) -> Void, onRelease: @escaping (Duration) -> Void,
           onKey: @escaping (_ isEscape: Bool) -> Void) {
-        // The value of kAXTrustedCheckOptionPrompt, a global var that Swift 6 rejects as shared state.
-        let prompt = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-        guard AXIsProcessTrustedWithOptions(prompt) else { return nil }
+        guard AXIsProcessTrusted() else { return nil }
         self.onPress = onPress
         self.onRelease = onRelease
         self.onKey = onKey

@@ -35,14 +35,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+        if !AXIsProcessTrusted() { askForAccessibility() }
+        startFnMonitor()
+        if Self.detectorModel == nil { log.error("no speech detector bundled: silence goes to the model") }
+        render()
+        prepareModel(hashing: false)
+    }
+
+    /// A record from another signature (an ad-hoc update) stays on in the list while tccd denies it
+    /// without asking: reset ours, then prompt. Denying is asked again at the next launch.
+    private func askForAccessibility() {
+        if let id = Bundle.main.bundleIdentifier {
+            let reset = Process()
+            reset.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+            reset.arguments = ["reset", "Accessibility", id]
+            do {
+                try reset.run()
+                reset.waitUntilExit()
+                log.info("accessibility record reset, status \(reset.terminationStatus, privacy: .public)")
+            } catch {
+                log.error("tccutil did not run: \(String(describing: type(of: error)), privacy: .public)")
+            }
+        }
+        // The value of kAXTrustedCheckOptionPrompt, a global var that Swift 6 rejects as shared state.
+        _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+    }
+
+    private func startFnMonitor() {
+        guard fnMonitor == nil else { return }
         fnMonitor = FnKeyMonitor(
             onPress: { [weak self] since in self?.handle(.fnPressed(sinceRelease: since)) },
             onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) },
             onKey: { [weak self] isEscape in self?.handle(.keyPressed(isEscape: isEscape)) })
         accessibilityItem.isHidden = fnMonitor != nil
-        if Self.detectorModel == nil { log.error("no speech detector bundled: silence goes to the model") }
-        render()
-        prepareModel(hashing: false)
     }
 
     /// Checks every file (by size; by SHA-256 when `hashing`), downloads the ones that fail, then loads.

@@ -4,6 +4,7 @@ import PapoRetoSherpa
 import os
 
 private let log = Logger(subsystem: "papo-reto", category: "model")
+private let accessibilityLog = Logger(subsystem: "papo-reto", category: "accessibility")
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -19,12 +20,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let modelItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let microphoneMenu = NSMenu()
     private let accessibilityItem = NSMenuItem(
-        title: "Allow Accessibility in System Settings, then reopen Papo Reto", action: nil, keyEquivalent: "")
+        title: "Allow Accessibility…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+    private var accessibilityObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
         modelItem.target = self
+        accessibilityItem.target = self
+        menu.delegate = self
         menu.addItem(modelItem)
         menu.addItem(accessibilityItem)
         let microphoneItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
@@ -35,14 +39,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
         statusItem = item
+        if !AXIsProcessTrusted() { askForAccessibility() }
+        startFnMonitor()
+        if Self.detectorModel == nil { log.error("no speech detector bundled: silence goes to the model") }
+        render()
+        prepareModel(hashing: false)
+    }
+
+    /// A record from another signature (an ad-hoc update) stays on in the list while tccd denies it
+    /// without asking: reset ours, then prompt. Denying is asked again at the next launch.
+    private func askForAccessibility() {
+        let id = Bundle.main.bundleIdentifier
+        // Off the main thread: a slow tccd must not hold the menu bar icon and the model load.
+        Task.detached(priority: .userInitiated) {
+            if let id {
+                let reset = Process()
+                reset.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+                reset.arguments = ["reset", "Accessibility", id]
+                do {
+                    try reset.run()
+                    reset.waitUntilExit()
+                    accessibilityLog.info("record reset, status \(reset.terminationStatus, privacy: .public)")
+                } catch {
+                    accessibilityLog.error("tccutil did not run: \(String(describing: type(of: error)), privacy: .public)")
+                }
+            }
+            // The value of kAXTrustedCheckOptionPrompt, a global var that Swift 6 rejects as shared state.
+            await MainActor.run { _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary) }
+        }
+    }
+
+    /// Retried when the Accessibility list changes and when the menu opens, so granting needs no reopening.
+    private func startFnMonitor() {
+        guard fnMonitor == nil else { return }
         fnMonitor = FnKeyMonitor(
             onPress: { [weak self] since in self?.handle(.fnPressed(sinceRelease: since)) },
             onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) },
             onKey: { [weak self] isEscape in self?.handle(.keyPressed(isEscape: isEscape)) })
         accessibilityItem.isHidden = fnMonitor != nil
-        if Self.detectorModel == nil { log.error("no speech detector bundled: silence goes to the model") }
-        render()
-        prepareModel(hashing: false)
+        if fnMonitor != nil {
+            accessibilityObserver.map(DistributedNotificationCenter.default().removeObserver)
+            accessibilityObserver = nil
+        } else if accessibilityObserver == nil {
+            // Undocumented, posted on any change to the list: no polling while the permission is missing.
+            accessibilityObserver = DistributedNotificationCenter.default().addObserver(
+                forName: Notification.Name("com.apple.accessibility.api"), object: nil, queue: .main
+            ) { _ in
+                MainActor.assumeIsolated {
+                    accessibilityLog.info("list changed, trusted: \(AXIsProcessTrusted(), privacy: .public)")
+                    self.startFnMonitor()
+                }
+                // Posted ~5 ms before tccd records the grant, and only once (macOS 26): look again later.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    MainActor.assumeIsolated { self.startFnMonitor() }
+                }
+            }
+        }
+    }
+
+    @objc private func openAccessibilitySettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
     /// Checks every file (by size; by SHA-256 when `hashing`), downloads the ones that fail, then loads.
@@ -197,8 +253,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return devices.first { $0.uid == uid }
     }
 
+    /// The main menu: a fallback should the Accessibility notification not arrive.
+    func menuWillOpen(_ menu: NSMenu) {
+        if menu !== microphoneMenu { startFnMonitor() }
+    }
+
     /// Rebuilt on each opening, so a device plugged in meanwhile shows up without polling.
     func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu === microphoneMenu else { return }
         let devices = AudioDevices.inputs()
         let inUse = currentMicrophone(among: devices)?.uid
         menu.removeAllItems()

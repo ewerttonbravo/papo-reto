@@ -11,8 +11,13 @@ SHERPA_LIB := vendor/sherpa-onnx/lib/.$(SHERPA_ARCH)
 
 VAD_MODEL := vendor/silero-vad/silero_vad.onnx
 
-$(SHERPA_LIB) $(VAD_MODEL): scripts/fetch-deps.sh
+# One rule after the other, never two fetches at once (make -j); touch, since fetch skips files it has.
+$(SHERPA_LIB): scripts/fetch-deps.sh
 	scripts/fetch-deps.sh libs
+	@touch $@
+$(VAD_MODEL): $(SHERPA_LIB)
+	scripts/fetch-deps.sh libs
+	@touch $@
 
 .PHONY: test
 test: $(SHERPA_LIB)

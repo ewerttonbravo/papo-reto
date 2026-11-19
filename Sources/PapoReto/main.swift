@@ -148,7 +148,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 log.info("skipped \(seconds, format: .fixed(precision: 2), privacy: .public) s of audio: \(String(describing: verdict), privacy: .public), checked in \(ContinuousClock.now - check, privacy: .public)")
                 return ("", processMemory().footprint)
             }
-            if Self.detectorModel != nil { log.info("speech found in \(ContinuousClock.now - check, privacy: .public)") }
             let start = ContinuousClock.now
             let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
             let footprint = processMemory().footprint
@@ -167,11 +166,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Created per dictation and freed on return: no RAM at rest (ADR-020). A detector that fails says speech.
     private nonisolated static func containsSpeech(_ samples: [Float], model: URL) -> Bool {
+        let start = ContinuousClock.now
         guard let detector = SpeechDetector(model: model) else {
             log.error("speech detector failed to load, transcribing anyway")
             return true
         }
-        return detector.containsSpeech(samples)
+        let found = detector.containsSpeech(samples)
+        if found { log.info("speech found in \(ContinuousClock.now - start, privacy: .public)") }
+        return found
     }
 
     private func didTranscribe(_ transcription: String, footprintMB: Double) {

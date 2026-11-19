@@ -40,6 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onRelease: { [weak self] held in self?.handle(.fnReleased(heldFor: held)) },
             onKey: { [weak self] isEscape in self?.handle(.keyPressed(isEscape: isEscape)) })
         accessibilityItem.isHidden = fnMonitor != nil
+        if Self.detectorModel == nil { log.error("no speech detector bundled: silence goes to the model") }
         render()
         prepareModel(hashing: false)
     }
@@ -147,7 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 log.info("skipped \(seconds, format: .fixed(precision: 2), privacy: .public) s of audio: \(String(describing: verdict), privacy: .public), checked in \(ContinuousClock.now - check, privacy: .public)")
                 return ("", processMemory().footprint)
             }
-            log.info("speech found in \(ContinuousClock.now - check, privacy: .public)")
+            if Self.detectorModel != nil { log.info("speech found in \(ContinuousClock.now - check, privacy: .public)") }
             let start = ContinuousClock.now
             let text = transcriber.transcribe(samples: samples, sampleRate: 16000)
             let footprint = processMemory().footprint

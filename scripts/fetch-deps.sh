@@ -25,10 +25,10 @@ fetch() {
 
 case "${1:-}" in
 libs)
-  case "$(uname -m)" in
+  case "${PAPO_ARCH:-$(uname -m)}" in
   x86_64) arch=x64 sha=b0107b8166c4131245380bc9b984345c4ea8637c65807f09ca5f501c72926be5 ;;
   arm64) arch=arm64 sha=ac5594ad237db56ec4a6c4b3fc48700441b33a07bb71c235f35530a52a93f2e3 ;;
-  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+  *) echo "Unsupported architecture: ${PAPO_ARCH:-$(uname -m)}" >&2; exit 1 ;;
   esac
   name=sherpa-onnx-$SHERPA-osx-$arch-shared-no-tts-lib
   fetch "$SHERPA_URL/releases/download/$SHERPA/$name.tar.bz2" "$sha" "$VENDOR/$name.tar.bz2"
@@ -45,6 +45,19 @@ libs)
   # Bundled into the .app (ADR-020): the asr-models release is mutable, so a replaced file fails here, not for users.
   fetch "$SHERPA_URL/releases/download/asr-models/silero_vad.onnx" \
     9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6 "$VENDOR_ROOT/silero-vad/silero_vad.onnx"
+  # Bundled into the .app with THIRD_PARTY_NOTICES.md.
+  notices="$VENDOR_ROOT/notices"
+  fetch "$SHERPA_URL/raw/$SHERPA/LICENSE" \
+    cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30 "$notices/sherpa-onnx-LICENSE.txt"
+  # Only in the onnxruntime zip that sherpa-onnx pins (cmake/onnxruntime-osx-arm64.cmake); the same file for both archs.
+  if [ ! -f "$notices/onnxruntime-ThirdPartyNotices.txt" ]; then
+    ort=onnxruntime-osx-arm64-1.28.2
+    fetch "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.28.2/$ort.zip" \
+      d9e5c0c79929e201f5b8eb095e6809a91ce78be9866a1bca0dfab7e20b40ae40 "$notices/$ort.zip"
+    unzip -p "$notices/$ort.zip" "$ort/ThirdPartyNotices.txt" > "$notices/onnxruntime-ThirdPartyNotices.txt.part"
+    mv "$notices/onnxruntime-ThirdPartyNotices.txt.part" "$notices/onnxruntime-ThirdPartyNotices.txt"
+    rm "$notices/$ort.zip"
+  fi
   ;;
 model)
   fetch "$MODEL_URL/encoder.int8.onnx" 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479 "$MODEL_DIR/encoder.int8.onnx"

@@ -6,19 +6,28 @@ TESTING_FLAGS := -Xswiftc -F$(CLT)/Library/Developer/Frameworks \
 	-Xlinker -rpath -Xlinker $(CLT)/Library/Developer/usr/lib
 endif
 
-SHERPA_ARCH := $(if $(filter x86_64,$(shell uname -m)),x64,arm64)
+NATIVE_ARCH := $(shell uname -m)
+# make release builds the other one too; the libs in vendor/ follow it. Not ARCH: other tools export that name.
+PAPO_ARCH ?= $(NATIVE_ARCH)
+SHERPA_ARCH := $(if $(filter x86_64,$(PAPO_ARCH)),x64,arm64)
 SHERPA_LIB := vendor/sherpa-onnx/lib/.$(SHERPA_ARCH)
 
 VAD_MODEL := vendor/silero-vad/silero_vad.onnx
+# Fetched last, after the sherpa-onnx LICENSE; copied by name, so a missing one fails make app.
+ORT_NOTICES := vendor/notices/onnxruntime-ThirdPartyNotices.txt
+NOTICES := Resources/THIRD_PARTY_NOTICES.md vendor/notices/sherpa-onnx-LICENSE.txt $(ORT_NOTICES)
 # What the app loads; the cxx-api stays out.
 BUNDLED_LIBS := $(addprefix vendor/sherpa-onnx/lib/,libsherpa-onnx-c-api.dylib libonnxruntime.dylib)
 
 # One rule after the other, never two fetches at once (make -j); touch, since fetch skips files it has.
 $(SHERPA_LIB): scripts/fetch-deps.sh
-	scripts/fetch-deps.sh libs
+	PAPO_ARCH=$(PAPO_ARCH) scripts/fetch-deps.sh libs
 	@touch $@
 $(VAD_MODEL): $(SHERPA_LIB)
-	scripts/fetch-deps.sh libs
+	PAPO_ARCH=$(PAPO_ARCH) scripts/fetch-deps.sh libs
+	@touch $@
+$(ORT_NOTICES): $(VAD_MODEL)
+	PAPO_ARCH=$(PAPO_ARCH) scripts/fetch-deps.sh libs
 	@touch $@
 
 .PHONY: test
@@ -56,30 +65,49 @@ bench: $(SHERPA_LIB)
 
 # scripts/dev-cert.sh creates it; ad-hoc otherwise, which resets the TCC permissions on every build.
 DEV_CERT ?= Papo Reto Dev
+# A codesign identity that overrides DEV_CERT; make release passes - (ad-hoc).
+SIGN ?=
 
 .PHONY: app run
-app: $(SHERPA_LIB) $(VAD_MODEL)
-	swift build -c release --product PapoReto
+app: $(SHERPA_LIB) $(VAD_MODEL) $(ORT_NOTICES)
+	swift build -c release --arch $(PAPO_ARCH) --product PapoReto
 	rm -rf build/PapoReto.app
 	mkdir -p build/PapoReto.app/Contents/MacOS
-	cp "$$(swift build -c release --show-bin-path)/PapoReto" build/PapoReto.app/Contents/MacOS/
+	cp "$$(swift build -c release --arch $(PAPO_ARCH) --show-bin-path)/PapoReto" build/PapoReto.app/Contents/MacOS/
 	cp Resources/Info.plist build/PapoReto.app/Contents/
 	mkdir -p build/PapoReto.app/Contents/Resources
-	cp $(VAD_MODEL) build/PapoReto.app/Contents/Resources/
+	cp $(VAD_MODEL) $(NOTICES) build/PapoReto.app/Contents/Resources/
 	mkdir -p build/PapoReto.app/Contents/Frameworks
 	cp $(BUNDLED_LIBS) build/PapoReto.app/Contents/Frameworks/
 	@# The repo's vendor/ rpath would hide a broken bundle on this Mac.
 	install_name_tool -delete_rpath "$(CURDIR)/vendor/sherpa-onnx/lib" \
 		-add_rpath @executable_path/../Frameworks build/PapoReto.app/Contents/MacOS/PapoReto
-	@ID=$$(DEV_CERT='$(DEV_CERT)' scripts/dev-cert.sh --identity); \
+	@ID='$(SIGN)'; if [ -z "$$ID" ]; then ID=$$(DEV_CERT='$(DEV_CERT)' scripts/dev-cert.sh --identity); \
 	if [ -n "$$ID" ]; then echo "Signing with \"$(DEV_CERT)\" ($$ID)"; \
-	else ID=-; echo "Signing ad-hoc: no \"$(DEV_CERT)\" identity, so TCC permissions reset (run scripts/dev-cert.sh)"; fi; \
+	else ID=-; echo "Signing ad-hoc: no \"$(DEV_CERT)\" identity, so TCC permissions reset (run scripts/dev-cert.sh)"; fi; fi; \
 	codesign --force --sign "$$ID" build/PapoReto.app/Contents/Frameworks/*.dylib && \
 	codesign --force --sign "$$ID" build/PapoReto.app
 	scripts/check-bundle.sh build/PapoReto.app
 
 run: app
 	open build/PapoReto.app
+
+VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+OTHER_ARCH := $(if $(filter x86_64,$(NATIVE_ARCH)),arm64,x86_64)
+
+# Ad-hoc, one zip per architecture (ADR-006); this Mac's last, so vendor/ ends with its libs, even after a failure.
+# No xattrs in the zip: com.apple.provenance is this Mac's; the signature lives in the files.
+.PHONY: release
+release:
+	rm -rf build/release
+	mkdir -p build/release
+	@for arch in $(OTHER_ARCH) $(NATIVE_ARCH); do \
+		zip=build/release/PapoReto-$(VERSION)-$$arch.zip; \
+		$(MAKE) app PAPO_ARCH=$$arch SIGN=- && \
+		ditto -c -k --norsrc --noextattr --noacl --keepParent build/PapoReto.app $$zip && \
+		scripts/check-release.sh $$zip && echo "$$zip: $$(du -sh build/PapoReto.app | cut -f1) app" || \
+		{ PAPO_ARCH=$(NATIVE_ARCH) scripts/fetch-deps.sh libs; exit 1; }; \
+	done
 
 INSTALL_DIR ?= /Applications
 

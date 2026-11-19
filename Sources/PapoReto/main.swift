@@ -4,6 +4,7 @@ import PapoRetoSherpa
 import os
 
 private let log = Logger(subsystem: "papo-reto", category: "model")
+private let accessibilityLog = Logger(subsystem: "papo-reto", category: "accessibility")
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -48,20 +49,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// A record from another signature (an ad-hoc update) stays on in the list while tccd denies it
     /// without asking: reset ours, then prompt. Denying is asked again at the next launch.
     private func askForAccessibility() {
-        if let id = Bundle.main.bundleIdentifier {
-            let reset = Process()
-            reset.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
-            reset.arguments = ["reset", "Accessibility", id]
-            do {
-                try reset.run()
-                reset.waitUntilExit()
-                log.info("accessibility record reset, status \(reset.terminationStatus, privacy: .public)")
-            } catch {
-                log.error("tccutil did not run: \(String(describing: type(of: error)), privacy: .public)")
+        let id = Bundle.main.bundleIdentifier
+        // Off the main thread: a slow tccd must not hold the menu bar icon and the model load.
+        Task.detached(priority: .userInitiated) {
+            if let id {
+                let reset = Process()
+                reset.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+                reset.arguments = ["reset", "Accessibility", id]
+                do {
+                    try reset.run()
+                    reset.waitUntilExit()
+                    accessibilityLog.info("record reset, status \(reset.terminationStatus, privacy: .public)")
+                } catch {
+                    accessibilityLog.error("tccutil did not run: \(String(describing: type(of: error)), privacy: .public)")
+                }
             }
+            // The value of kAXTrustedCheckOptionPrompt, a global var that Swift 6 rejects as shared state.
+            await MainActor.run { _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary) }
         }
-        // The value of kAXTrustedCheckOptionPrompt, a global var that Swift 6 rejects as shared state.
-        _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
 
     /// Retried when the Accessibility list changes and when the menu opens, so granting needs no reopening.
@@ -81,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 forName: Notification.Name("com.apple.accessibility.api"), object: nil, queue: .main
             ) { _ in
                 MainActor.assumeIsolated {
-                    log.info("accessibility list changed, trusted: \(AXIsProcessTrusted(), privacy: .public)")
+                    accessibilityLog.info("list changed, trusted: \(AXIsProcessTrusted(), privacy: .public)")
                     self.startFnMonitor()
                 }
                 // Posted ~5 ms before tccd records the grant, and only once (macOS 26): look again later.

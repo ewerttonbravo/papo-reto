@@ -1,12 +1,13 @@
 #!/bin/bash
-# Downloads the pinned sherpa-onnx libs (libs) or the Parakeet model (model), verifying SHA-256.
+# Downloads the pinned sherpa-onnx libs and Silero VAD (libs) or the Parakeet model (model), verifying SHA-256.
 set -euo pipefail
 
 SHERPA=v2.0.1
 SHERPA_URL=https://github.com/k2-fsa/sherpa-onnx
 MODEL_URL=https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/ed5d745623472f97cfc2e6c2916ee248798fc5a8
 MODEL_DIR="$HOME/Library/Application Support/PapoReto/Models/parakeet-tdt-0.6b-v3-int8"
-VENDOR="$(cd "$(dirname "$0")/.." && pwd)/vendor/sherpa-onnx"
+VENDOR_ROOT="$(cd "$(dirname "$0")/.." && pwd)/vendor"
+VENDOR="$VENDOR_ROOT/sherpa-onnx"
 
 # fetch <url> <sha256> <dest>: skips an existing dest; never leaves an unverified file behind.
 fetch() {
@@ -41,6 +42,9 @@ libs)
     touch "$VENDOR/lib.tmp/.$arch"
     mv "$VENDOR/lib.tmp" "$VENDOR/lib"
   fi
+  # Bundled into the .app (ADR-020): the asr-models release is mutable, so a replaced file fails here, not for users.
+  fetch "$SHERPA_URL/releases/download/asr-models/silero_vad.onnx" \
+    9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6 "$VENDOR_ROOT/silero-vad/silero_vad.onnx"
   ;;
 model)
   fetch "$MODEL_URL/encoder.int8.onnx" 1afbe69c1ffdabee94755f42e4daf1d93549131a3da11356bda84fcef0f2c479 "$MODEL_DIR/encoder.int8.onnx"

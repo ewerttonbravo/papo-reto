@@ -25,10 +25,10 @@ fetch() {
 
 case "${1:-}" in
 libs)
-  case "$(uname -m)" in
+  case "${ARCH:-$(uname -m)}" in
   x86_64) arch=x64 sha=b0107b8166c4131245380bc9b984345c4ea8637c65807f09ca5f501c72926be5 ;;
   arm64) arch=arm64 sha=ac5594ad237db56ec4a6c4b3fc48700441b33a07bb71c235f35530a52a93f2e3 ;;
-  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+  *) echo "Unsupported architecture: ${ARCH:-$(uname -m)}" >&2; exit 1 ;;
   esac
   name=sherpa-onnx-$SHERPA-osx-$arch-shared-no-tts-lib
   fetch "$SHERPA_URL/releases/download/$SHERPA/$name.tar.bz2" "$sha" "$VENDOR/$name.tar.bz2"

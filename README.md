@@ -43,4 +43,4 @@ make bench BENCH_AUDIO=<dir with WAVs>  # text, latency and RAM per file, 3 runs
 The model is [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) (CC-BY-4.0), in the int8 export by sherpa-onnx.
 
 ## License
-MIT. See [LICENSE](LICENSE). The bundled libraries and the model keep their own licenses: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT. See [LICENSE](LICENSE). The bundled libraries and the model keep their own licenses: see [THIRD_PARTY_NOTICES.md](Resources/THIRD_PARTY_NOTICES.md).

@@ -78,6 +78,11 @@ $(ARTWORK): Sources/PapoReto/ProfileGlyph.swift scripts/artwork.swift
 $(ICON): $(ARTWORK)
 	$(ARTWORK) icns $@
 
+# The README and social preview images, committed: run after changing the drawing.
+.PHONY: showcase
+showcase: $(ARTWORK)
+	$(ARTWORK) showcase assets
+
 app: $(SHERPA_LIB) $(VAD_MODEL) $(ORT_NOTICES) $(ICON)
 	swift build -c release --arch $(PAPO_ARCH) --product PapoReto
 	rm -rf build/PapoReto.app

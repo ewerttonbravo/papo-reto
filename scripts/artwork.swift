@@ -1,16 +1,88 @@
 // Draws the app's artwork from Sources/PapoReto/ProfileGlyph.swift, compiled with it by make, so every image shares one drawing:
-// icns writes the app icon, the listening profile on the Grafite squircle of papo-reto-docs/design/icone/previa.html.
+// icns writes the app icon, the listening profile on the Grafite squircle of papo-reto-docs/design/icone/previa.html;
+// showcase writes the README and social preview PNGs, committed in assets/ because GitHub serves them from the repo.
 import AppKit
 
 @main
 enum Artwork {
     static func main() throws {
         let args = CommandLine.arguments
-        guard args.count == 3, args[1] == "icns" else {
-            print("usage: artwork icns <AppIcon.icns>")
+        let output = args.count == 3 ? URL(fileURLWithPath: args[2]) : nil
+        switch (args.count == 3 ? args[1] : nil, output) {
+        case ("icns", let output?): try icns(output)
+        case ("showcase", let output?): try showcase(output)
+        default:
+            print("usage: artwork icns <AppIcon.icns> | artwork showcase <dir>")
             exit(2)
         }
-        try icns(URL(fileURLWithPath: args[2]))
+    }
+
+    static func showcase(_ dir: URL) throws {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try iconPNG(pixels: 256).write(to: dir.appendingPathComponent("icon.png"))
+        try menuBarPNG(dark: false).write(to: dir.appendingPathComponent("menu-bar-light.png"))
+        try menuBarPNG(dark: true).write(to: dir.appendingPathComponent("menu-bar-dark.png"))
+        try socialPreviewPNG().write(to: dir.appendingPathComponent("social-preview.png"))
+    }
+
+    /// The three profile states, each on a piece of menu bar with its name below, at 2x for Retina.
+    static func menuBarPNG(dark: Bool) -> Data {
+        let states: [(ProfileGlyph.Mark, String)] = [(.none, "Ready"), (.waves, "Listening"), (.dots, "Thinking")]
+        let cell: CGFloat = 120, bar = NSRect(x: 30, y: 4, width: 60, height: 26)
+        return png(width: Int(cell) * states.count, height: 60, scale: 2) {
+            for (index, (mark, name)) in states.enumerated() {
+                let x = CGFloat(index) * cell
+                rgb(dark ? 0x2c2d30 : 0xebebed).setFill()
+                NSBezierPath(roundedRect: bar.offsetBy(dx: x, dy: 0), xRadius: 7, yRadius: 7).fill()
+                // The menu bar's 18 pt glyph, centered on the bar.
+                let scale = 18 / ProfileGlyph.viewBox.height
+                NSGraphicsContext.saveGraphicsState()
+                let glyph = NSAffineTransform()
+                glyph.translateX(by: x + cell / 2 - ProfileGlyph.viewBox.width * scale / 2, yBy: bar.midY - 9)
+                glyph.scale(by: scale)
+                glyph.translateX(by: -ProfileGlyph.viewBox.minX, yBy: -ProfileGlyph.viewBox.minY)
+                glyph.concat()
+                let ink = rgb(dark ? 0xf5f5f7 : 0x1d1d1f)
+                ProfileGlyph.draw(mark, head: ink, wave: ink)
+                NSGraphicsContext.restoreGraphicsState()
+                text(name, centeredAt: x + cell / 2, top: 38, font: .systemFont(ofSize: 13, weight: .medium),
+                     color: rgb(dark ? 0x9198a1 : 0x59636e))
+            }
+        }
+    }
+
+    /// GitHub's 1280 × 640 card for shared links, content inside its 40 pt safe border.
+    static func socialPreviewPNG() -> Data {
+        png(width: 1280, height: 640, scale: 1) {
+            NSGradient(starting: rgb(0x2b2e33), ending: rgb(0x16181b))!.draw(in: NSRect(x: 0, y: 0, width: 1280, height: 640), angle: 90)
+            NSGraphicsContext.saveGraphicsState()
+            let icon = NSAffineTransform()
+            icon.translateX(by: 70, yBy: 130)
+            icon.scale(by: 380 / 1024)
+            icon.concat()
+            drawIcon()
+            NSGraphicsContext.restoreGraphicsState()
+            text("Papo Reto", left: 500, top: 196, font: .systemFont(ofSize: 104, weight: .bold), color: rgb(0xf3efe6))
+            text("Voice dictation for macOS in", left: 504, top: 342, font: .systemFont(ofSize: 40), color: rgb(0xc9c4ba))
+            text("Brazilian Portuguese. 100% local.", left: 504, top: 394, font: .systemFont(ofSize: 40), color: rgb(0xc9c4ba))
+        }
+    }
+
+    static func text(_ string: String, centeredAt x: CGFloat, top: CGFloat, font: NSFont, color: NSColor) {
+        let width = NSAttributedString(string: string, attributes: [.font: font]).size().width
+        text(string, left: x - width / 2, top: top, font: font, color: color)
+    }
+
+    /// One line whose box starts at top, unflipped locally so the glyphs stand upright in the y-down canvas.
+    static func text(_ string: String, left: CGFloat, top: CGFloat, font: NSFont, color: NSColor) {
+        let line = NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: color])
+        NSGraphicsContext.saveGraphicsState()
+        let upright = NSAffineTransform()
+        upright.translateX(by: left, yBy: top + line.size().height)
+        upright.scaleX(by: 1, yBy: -1)
+        upright.concat()
+        line.draw(at: .zero)
+        NSGraphicsContext.restoreGraphicsState()
     }
 
     static func icns(_ output: URL) throws {

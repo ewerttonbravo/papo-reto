@@ -169,20 +169,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Detached and before the microphone: the sleep runs while a cold start blocks the main thread ~300 ms.
             recordingTimer = Task.detached { [weak self] in
                 try? await Task.sleep(for: AppState.holdThreshold)
-                await MainActor.run {
-                    // A cancel can land after the sleep ends; without this, a stale timer acts on the next recording.
-                    guard !Task.isCancelled else { return }
-                    // A tap's release can still be queued behind a busy main thread: ask the keyboard itself.
-                    if CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn) {
-                        self?.handle(.fnHeldPastThreshold)
-                    }
-                }
+                await self?.recordingTimerFired(.fnHeldPastThreshold)
                 try? await Task.sleep(for: AppState.recordingLimit - AppState.holdThreshold)
-                await MainActor.run {
-                    guard !Task.isCancelled else { return }
-                    log.info("recording limit reached")
-                    self?.handle(.recordingLimitReached)
-                }
+                await self?.recordingTimerFired(.recordingLimitReached)
             }
             // Nothing saved means the default: skip asking Core Audio on every Fn press.
             recorder.start(from: savedMicrophone == nil ? nil : currentMicrophone(among: AudioDevices.inputs()))
@@ -201,6 +190,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // The microphone is already off: any sound will do.
         case .playStopSound: play("Pop")
         }
+    }
+
+    private func recordingTimerFired(_ event: AppEvent) {
+        // A cancel can land after the sleep ends; without this, a stale timer acts on the next recording.
+        guard !Task.isCancelled else { return }
+        if event == .recordingLimitReached { log.info("recording limit reached") }
+        // A tap's release can still be queued behind a busy main thread: ask the keyboard itself.
+        if event == .fnHeldPastThreshold,
+           !CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn) { return }
+        handle(event)
     }
 
     /// From the start even when still playing: play() on a playing NSSound does nothing.

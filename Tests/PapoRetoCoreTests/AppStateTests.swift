@@ -88,11 +88,12 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.discardRecording])
 }
 
-@Test func fnPressedUnder400msAfterATapStartsHandsFree() {
+/// The sound goes before the microphone, which then records less of it.
+@Test func fnPressedUnder400msAfterATapStartsHandsFreeWithTheStartSound() {
     let (state, effects) = afterTap.handling(.fnPressed(sinceRelease: .milliseconds(399)))
     #expect(state == handsFree)
     #expect(state.iconName == recording.iconName)
-    #expect(effects == [.startRecording])
+    #expect(effects == [.playStartSound, .startRecording])
 }
 
 @Test func fnPressedFrom400msAfterATapStartsPushToTalk() {

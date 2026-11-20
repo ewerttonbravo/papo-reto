@@ -71,10 +71,12 @@ SIGN ?=
 .PHONY: app run
 # Drawn by the app's own ProfileGlyph.swift, so the menu bar and the app icon never drift apart.
 ICON := build/AppIcon.icns
-$(ICON): Sources/PapoReto/ProfileGlyph.swift scripts/app-icon.swift
+ARTWORK := build/artwork
+$(ARTWORK): Sources/PapoReto/ProfileGlyph.swift scripts/artwork.swift
 	mkdir -p build
-	swiftc -parse-as-library -O $^ -o build/app-icon
-	build/app-icon $@
+	swiftc -parse-as-library -O $^ -o $@
+$(ICON): $(ARTWORK)
+	$(ARTWORK) icns $@
 
 app: $(SHERPA_LIB) $(VAD_MODEL) $(ORT_NOTICES) $(ICON)
 	swift build -c release --arch $(PAPO_ARCH) --product PapoReto

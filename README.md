@@ -7,7 +7,7 @@ In development: holding `Fn` for more than 300 ms records the microphone chosen 
 The first launch asks for Accessibility (to read the `Fn` key and send Cmd+V; `Fn` works as soon as you grant it) and, on the first dictation, for the Microphone. Until Accessibility is granted, the menu's "Allow Accessibility…" opens its settings. Set System Settings → Keyboard → "Press 🌐 key to" → "Do Nothing", or macOS also acts on `Fn`.
 
 ## Install
-Building from source (below) is the recommended path. To use a prebuilt app, download from [Releases](https://github.com/ewerttonbravo/papo-reto/releases) the zip for your Mac: `arm64` for Apple silicon (M1 and later), `x86_64` for Intel (Apple menu → About This Mac). Unzip it and move `PapoReto.app` to Applications. Requires macOS 13+.
+Building from source (below) is the recommended path. To use a prebuilt app, download the `x86_64` zip from [Releases](https://github.com/ewerttonbravo/papo-reto/releases). It is built and tested for Intel Macs (Apple menu → About This Mac); the native Apple silicon build is not tested yet, so on M1 and later build from source. Unzip it and move `PapoReto.app` to Applications. Requires macOS 13+.
 
 The app is not notarized by Apple, so macOS blocks its first launch. Open it once, then click "Open Anyway" in System Settings → Privacy & Security; or run:
 

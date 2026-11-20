@@ -166,18 +166,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func perform(_ effect: AppEffect) {
         switch effect {
         case .startRecording:
+            // Detached and before the microphone: the sleep runs while a cold start blocks the main thread ~300 ms.
+            recordingTimer = Task.detached { [weak self] in
+                try? await Task.sleep(for: AppState.holdThreshold)
+                await MainActor.run {
+                    // A cancel can land after the sleep ends; without this, a stale timer acts on the next recording.
+                    guard !Task.isCancelled else { return }
+                    // A tap's release can still be queued behind a busy main thread: ask the keyboard itself.
+                    if CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn) {
+                        self?.handle(.fnHeldPastThreshold)
+                    }
+                }
+                try? await Task.sleep(for: AppState.recordingLimit - AppState.holdThreshold)
+                await MainActor.run {
+                    guard !Task.isCancelled else { return }
+                    log.info("recording limit reached")
+                    self?.handle(.recordingLimitReached)
+                }
+            }
             // Nothing saved means the default: skip asking Core Audio on every Fn press.
             recorder.start(from: savedMicrophone == nil ? nil : currentMicrophone(among: AudioDevices.inputs()))
-            recordingTimer = Task { [weak self] in
-                try? await Task.sleep(for: AppState.holdThreshold)
-                // A cancel can land after the sleep ends; without this, a stale timer acts on the next recording.
-                guard !Task.isCancelled else { return }
-                self?.handle(.fnHeldPastThreshold)
-                try? await Task.sleep(for: AppState.recordingLimit - AppState.holdThreshold)
-                guard !Task.isCancelled else { return }
-                log.info("recording limit reached")
-                self?.handle(.recordingLimitReached)
-            }
         case .stopRecording: recordingTimer?.cancel(); pendingSamples = recorder.stop()
         case .discardRecording: recordingTimer?.cancel(); _ = recorder.stop(); pendingSamples = []
         case .transcribe: transcribe()

@@ -1,6 +1,14 @@
-# Papo Reto
+<p align="center"><img src="assets/icon.png" width="128" alt="Papo Reto icon"></p>
+<h1 align="center">Papo Reto</h1>
 
 Voice dictation for macOS, focused on Brazilian Portuguese (PT-BR), 100% local. Hold `Fn`, speak, release: the text appears at the cursor.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/menu-bar-dark.png">
+    <img src="assets/menu-bar-light.png" width="360" alt="The menu bar icon when ready, listening and thinking">
+  </picture>
+</p>
 
 In development: holding `Fn` for more than 300 ms records the microphone chosen in the menu bar (Microphone → System Default or a device; the choice is saved, and while that device is unplugged the system default records), and on release the transcribed text is pasted at the cursor with Cmd+V. Your previous clipboard comes back 250 ms later, except a password from a password manager, which is left out. Clipboard managers that honor `org.nspasteboard.TransientType` skip the dictation. With no text field in focus, the dictation is lost. For longer dictation, double-tap `Fn` (second press within 400 ms of releasing the first) to record hands-free; the next `Fn` press stops and pastes. `Esc`, or any key pressed while `Fn` is held (arrows, F1-F12), cancels the recording and nothing is pasted; the `Esc` still reaches the focused app. A sound confirms that recording started (once `Fn` is held past 300 ms, or when hands-free begins) and another that it stopped; cancelling is silent. A recording stops by itself at 2 minutes, with the stop sound, and is transcribed whole. After a long dictation (from ~20 s) the model reloads to give its memory back (hourglass icon for a few seconds); a press while the model is loading is transcribed once it is ready.
 
@@ -26,6 +34,7 @@ scripts/fetch-deps.sh model  # Parakeet TDT 0.6B v3 int8 (~670 MB, SHA-256 check
 make install  # builds the app and installs it in /Applications, quitting and reopening a running one
 make app    # builds build/PapoReto.app for local use
 make release  # ad-hoc zips for arm64 and x86_64 in build/release, each checked by scripts/check-release.sh
+make showcase  # redraws the README and social preview images in assets/ after a change to the icon
 make run    # builds and opens the app
 ```
 

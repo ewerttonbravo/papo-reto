@@ -1,7 +1,7 @@
 import AppKit
 
 /// The "papo reto" profile, variant C of papo-reto-docs/design/icone/previa.html, in its SVG units (y down).
-/// Shared with scripts/app-icon.swift, so it imports AppKit only.
+/// Shared with scripts/artwork.swift, so it imports AppKit only.
 enum ProfileGlyph {
     enum Mark { case none, waves, dots }
 

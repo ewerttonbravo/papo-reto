@@ -89,7 +89,8 @@ public struct AppState: Sendable, Equatable {
             let doubleTap = afterTap && sinceRelease.map { $0 < Self.doubleTapWindow } == true
             next.activity = doubleTap ? .handsFree : .recording
             next.afterTap = false
-            return (next, [.startRecording])
+            // Push-to-talk sounds once confirmed (fnHeldPastThreshold); a double tap already is.
+            return (next, (doubleTap ? [.playStartSound] : []) + [.startRecording])
         case (.fnHeldPastThreshold, _, .recording):
             return (self, [.playStartSound])
         case (.fnReleased(let held), _, .recording):

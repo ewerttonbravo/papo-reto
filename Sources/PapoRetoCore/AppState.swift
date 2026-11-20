@@ -9,12 +9,16 @@ public enum AppEvent: Sendable, Equatable {
     /// nil on the first press since launch.
     case fnPressed(sinceRelease: Duration?)
     case fnReleased(heldFor: Duration)
+    /// The adapter's timer: Fn still held `holdThreshold` after the press, so it is dictation.
+    case fnHeldPastThreshold
     case transcribed(footprintMB: Double)
 }
 
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
-    case startRecording, stopRecording, discardRecording, transcribe, reloadModel, alertRecordingLimit
+    case startRecording, stopRecording, discardRecording, transcribe, reloadModel
+    /// Dictation confirmed, and every stop to transcribe (the 2 min limit too); cancels are silent.
+    case playStartSound, playStopSound
     /// Check every file's SHA-256 (Retry: the launch checks sizes), download what fails, then load.
     case prepareModel
 }
@@ -86,24 +90,27 @@ public struct AppState: Sendable, Equatable {
             let doubleTap = afterTap && sinceRelease.map { $0 < Self.doubleTapWindow } == true
             next.activity = doubleTap ? .handsFree : .recording
             next.afterTap = false
-            return (next, [.startRecording])
+            // Push-to-talk sounds once confirmed (fnHeldPastThreshold); a double tap already is.
+            return (next, (doubleTap ? [.playStartSound] : []) + [.startRecording])
+        case (.fnHeldPastThreshold, _, .recording):
+            return (self, [.playStartSound])
         case (.fnReleased(let held), _, .recording):
             guard held > Self.holdThreshold else {
                 next.activity = .idle
                 next.afterTap = true
                 return (next, [.discardRecording])
             }
-            return stoppingToTranscribe(alertingLimit: false)
+            return stoppingToTranscribe()
         case (.fnPressed, _, .handsFree):
-            return stoppingToTranscribe(alertingLimit: false)
+            return stoppingToTranscribe()
         // A tap then a hold to talk: the hold's release ends it like push-to-talk.
         case (.fnReleased(let held), _, .handsFree) where held > Self.holdThreshold:
-            return stoppingToTranscribe(alertingLimit: false)
+            return stoppingToTranscribe()
         case (.keyPressed, _, .recording), (.keyPressed(isEscape: true), _, .handsFree):
             next.activity = .idle
             return (next, [.discardRecording])
         case (.recordingLimitReached, _, .recording), (.recordingLimitReached, _, .handsFree):
-            return stoppingToTranscribe(alertingLimit: true)
+            return stoppingToTranscribe()
         case (.transcribed(let footprintMB), _, .transcribing):
             next.activity = .idle
             guard footprintMB >= Self.reloadAtFootprintMB else { return (next, []) }
@@ -120,9 +127,9 @@ public struct AppState: Sendable, Equatable {
     }
 
     /// Without the model the audio waits; `.modelLoaded` transcribes it.
-    private func stoppingToTranscribe(alertingLimit: Bool) -> (state: AppState, effects: [AppEffect]) {
+    private func stoppingToTranscribe() -> (state: AppState, effects: [AppEffect]) {
         var next = self
         next.activity = .transcribing
-        return (next, [.stopRecording] + (alertingLimit ? [.alertRecordingLimit] : []) + (model == .ready ? [.transcribe] : []))
+        return (next, [.stopRecording, .playStopSound] + (model == .ready ? [.transcribe] : []))
     }
 }

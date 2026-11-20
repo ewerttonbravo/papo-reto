@@ -15,7 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var fnMonitor: FnKeyMonitor?
     private let recorder = AudioRecorder()
     private var pendingSamples: [Float] = []
-    private var recordingLimit: Task<Void, Never>?
+    /// Sends fnHeldPastThreshold, then recordingLimitReached; cancelled when the recording ends.
+    private var recordingTimer: Task<Void, Never>?
     /// Download progress, or Retry after a failure.
     private let modelItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let microphoneMenu = NSMenu()
@@ -165,16 +166,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func perform(_ effect: AppEffect) {
         switch effect {
         case .startRecording:
+            // Detached and before the microphone: the sleep runs while a cold start blocks the main thread ~300 ms.
+            recordingTimer = Task.detached { [weak self] in
+                try? await Task.sleep(for: AppState.holdThreshold)
+                await self?.recordingTimerFired(.fnHeldPastThreshold)
+                try? await Task.sleep(for: AppState.recordingLimit - AppState.holdThreshold)
+                await self?.recordingTimerFired(.recordingLimitReached)
+            }
             // Nothing saved means the default: skip asking Core Audio on every Fn press.
             recorder.start(from: savedMicrophone == nil ? nil : currentMicrophone(among: AudioDevices.inputs()))
-            recordingLimit = Task { [weak self] in
-                try? await Task.sleep(for: AppState.recordingLimit)
-                // A cancel can land after the sleep ends; without this, a stale timer stops the next recording.
-                guard !Task.isCancelled else { return }
-                self?.handle(.recordingLimitReached)
-            }
-        case .stopRecording: recordingLimit?.cancel(); pendingSamples = recorder.stop()
-        case .discardRecording: recordingLimit?.cancel(); _ = recorder.stop(); pendingSamples = []
+        case .stopRecording: recordingTimer?.cancel(); pendingSamples = recorder.stop()
+        case .discardRecording: recordingTimer?.cancel(); _ = recorder.stop(); pendingSamples = []
         case .transcribe: transcribe()
         case .reloadModel:
             log.info("reloading the model to give its RAM back")
@@ -183,10 +185,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             prepareModel(hashing: false)
         // Retry hashes: a same-size corrupt file passes the size check and would fail again.
         case .prepareModel: prepareModel(hashing: true)
-        case .alertRecordingLimit:
-            log.info("recording limit reached")
-            NSSound(named: "Tink")?.play()
+        // Bottle: the microphone records it, and in the T13 spike it was the only one that kept the first word.
+        case .playStartSound: play("Bottle")
+        // The microphone is already off: any sound will do.
+        case .playStopSound: play("Pop")
         }
+    }
+
+    private func recordingTimerFired(_ event: AppEvent) {
+        // A cancel can land after the sleep ends; without this, a stale timer acts on the next recording.
+        guard !Task.isCancelled else { return }
+        if event == .recordingLimitReached { log.info("recording limit reached") }
+        // A tap's release can still be queued behind a busy main thread: ask the keyboard itself.
+        if event == .fnHeldPastThreshold,
+           !CGEventSource.flagsState(.combinedSessionState).contains(.maskSecondaryFn) { return }
+        handle(event)
+    }
+
+    /// From the start even when still playing: play() on a playing NSSound does nothing.
+    private func play(_ systemSound: String) {
+        guard let sound = NSSound(named: systemSound) else { return }
+        sound.stop()
+        sound.play()
     }
 
     /// The Core asks for `.transcribe` only with the model ready, one transcription at a time.

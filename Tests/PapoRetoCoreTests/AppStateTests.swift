@@ -63,10 +63,22 @@ func downloadStartedWithAudioDiscardsIt(activity: AppState.Activity) {
     #expect(effects == [.startRecording])
 }
 
-@Test func fnHeldOver300msStopsAndTranscribes() {
+@Test func fnHeldOver300msStopsWithTheStopSoundAndTranscribes() {
     let (state, effects) = recording.handling(.fnReleased(heldFor: .milliseconds(301)))
     #expect(state == transcribing)
-    #expect(effects == [.stopRecording, .transcribe])
+    #expect(effects == [.stopRecording, .playStopSound, .transcribe])
+}
+
+@Test func fnHeldPastThresholdWhileRecordingPlaysStartSound() {
+    let (state, effects) = recording.handling(.fnHeldPastThreshold)
+    #expect(state == recording)
+    #expect(effects == [.playStartSound])
+}
+
+/// A tap already released, hands-free (sounded when it began) and transcribing stay silent.
+@Test(arguments: [afterTap, handsFree, transcribing])
+func fnHeldPastThresholdOutsideRecordingIsSilent(state: AppState) {
+    #expect(state.handling(.fnHeldPastThreshold) == (state, []))
 }
 
 @Test(arguments: [299, 300])
@@ -76,11 +88,12 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.discardRecording])
 }
 
-@Test func fnPressedUnder400msAfterATapStartsHandsFree() {
+/// The sound goes before the microphone, which then records less of it.
+@Test func fnPressedUnder400msAfterATapStartsHandsFreeWithTheStartSound() {
     let (state, effects) = afterTap.handling(.fnPressed(sinceRelease: .milliseconds(399)))
     #expect(state == handsFree)
     #expect(state.iconName == recording.iconName)
-    #expect(effects == [.startRecording])
+    #expect(effects == [.playStartSound, .startRecording])
 }
 
 @Test func fnPressedFrom400msAfterATapStartsPushToTalk() {
@@ -95,16 +108,16 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.startRecording])
 }
 
-@Test func fnPressedInHandsFreeStopsAndTranscribes() {
+@Test func fnPressedInHandsFreeStopsWithTheStopSoundAndTranscribes() {
     let (state, effects) = handsFree.handling(.fnPressed(sinceRelease: .seconds(5)))
     #expect(state == transcribing)
-    #expect(effects == [.stopRecording, .transcribe])
+    #expect(effects == [.stopRecording, .playStopSound, .transcribe])
 }
 
 @Test func fnPressedInHandsFreeWhileLoadingWaitsForTheModel() {
     let (state, effects) = AppState(model: .loading, activity: .handsFree).handling(.fnPressed(sinceRelease: .seconds(5)))
     #expect(state == AppState(model: .loading, activity: .transcribing))
-    #expect(effects == [.stopRecording])
+    #expect(effects == [.stopRecording, .playStopSound])
 }
 
 @Test(arguments: [100, 300])
@@ -114,10 +127,10 @@ func fnTappedInHandsFreeKeepsRecording(ms: Int) {
     #expect(effects.isEmpty)
 }
 
-@Test func fnHeldOver300msInHandsFreeStopsAndTranscribes() {
+@Test func fnHeldOver300msInHandsFreeStopsWithTheStopSoundAndTranscribes() {
     let (state, effects) = handsFree.handling(.fnReleased(heldFor: .milliseconds(301)))
     #expect(state == transcribing)
-    #expect(effects == [.stopRecording, .transcribe])
+    #expect(effects == [.stopRecording, .playStopSound, .transcribe])
 }
 
 @Test func transcribedWithFootprintUnder900MBKeepsTheModel() {
@@ -144,7 +157,7 @@ func transcribedWithFootprintFrom900MBReloadsTheModel(footprintMB: Double) {
     let (state, effects) = AppState(model: .loading, activity: .recording)
         .handling(.fnReleased(heldFor: .milliseconds(301)))
     #expect(state == AppState(model: .loading, activity: .transcribing))
-    #expect(effects == [.stopRecording])
+    #expect(effects == [.stopRecording, .playStopSound])
 }
 
 @Test func modelLoadedWithPendingAudioTranscribes() {
@@ -168,16 +181,16 @@ func fnIgnoredWhenModelUnavailableOrTranscribing(state: AppState) {
 }
 
 @Test(arguments: [recording, handsFree])
-func recordingLimitStopsTranscribesAndAlerts(state: AppState) {
+func recordingLimitStopsWithTheStopSoundAndTranscribes(state: AppState) {
     let (state, effects) = state.handling(.recordingLimitReached)
     #expect(state == transcribing)
-    #expect(effects == [.stopRecording, .alertRecordingLimit, .transcribe])
+    #expect(effects == [.stopRecording, .playStopSound, .transcribe])
 }
 
 @Test func recordingLimitWhileLoadingWaitsForTheModel() {
     let (state, effects) = AppState(model: .loading, activity: .recording).handling(.recordingLimitReached)
     #expect(state == AppState(model: .loading, activity: .transcribing))
-    #expect(effects == [.stopRecording, .alertRecordingLimit])
+    #expect(effects == [.stopRecording, .playStopSound])
 }
 
 @Test(arguments: [ready, transcribing])

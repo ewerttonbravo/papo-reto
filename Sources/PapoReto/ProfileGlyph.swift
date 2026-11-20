@@ -8,7 +8,7 @@ enum ProfileGlyph {
     /// The preview's viewBox: the figure with its stroke and waves.
     static let viewBox = NSRect(x: 4, y: -2, width: 96, height: 90)
 
-    /// Draws in viewBox units into a y-down context. The dots are punched out of whatever is below them.
+    /// Draws in viewBox units into a y-down context.
     static func draw(_ mark: Mark, head: NSColor, wave: NSColor) {
         let silhouette = NSBezierPath()
         silhouette.move(to: NSPoint(x: 32, y: 84))
@@ -24,15 +24,21 @@ enum ProfileGlyph {
         silhouette.close()
         silhouette.lineWidth = 7
         silhouette.lineJoinStyle = .round
+        NSGraphicsContext.saveGraphicsState()
+        if mark == .dots {
+            // Holes by geometry, not a .clear blend, which would erase whatever the image is drawn over.
+            let holes = NSBezierPath(rect: viewBox)
+            for x: CGFloat in [34, 48, 62] { holes.appendOval(in: NSRect(x: x - 5.5, y: 24 - 5.5, width: 11, height: 11)) }
+            holes.windingRule = .evenOdd
+            holes.addClip()
+        }
         head.setFill()
         head.setStroke()
         silhouette.fill()
         silhouette.stroke()
+        NSGraphicsContext.restoreGraphicsState()
 
-        switch mark {
-        case .none:
-            break
-        case .waves:
+        if mark == .waves {
             wave.setStroke()
             // The preview's three arcs share this center and sweep about -2° to 62°.
             for radius: CGFloat in [13, 22, 31] {
@@ -42,21 +48,17 @@ enum ProfileGlyph {
                 arc.lineCapStyle = .round
                 arc.stroke()
             }
-        case .dots:
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current?.compositingOperation = .clear
-            for x: CGFloat in [34, 48, 62] {
-                NSBezierPath(ovalIn: NSRect(x: x - 5.5, y: 24 - 5.5, width: 11, height: 11)).fill()
-            }
-            NSGraphicsContext.restoreGraphicsState()
         }
     }
 
     /// A template image at the menu bar's 18 pt, so it follows the light and dark bars.
     static func menuBarImage(_ mark: Mark) -> NSImage {
         let scale = 18 / viewBox.height
-        let image = NSImage(size: NSSize(width: viewBox.width * scale, height: 18), flipped: true) { _ in
+        // Whole points (the figure is 19.2 wide), so a 1x display does not resample the image.
+        let width = (viewBox.width * scale).rounded(.up)
+        let image = NSImage(size: NSSize(width: width, height: 18), flipped: true) { _ in
             let transform = NSAffineTransform()
+            transform.translateX(by: (width - viewBox.width * scale) / 2, yBy: 0)
             transform.scale(by: scale)
             transform.translateX(by: -viewBox.minX, yBy: -viewBox.minY)
             transform.concat()

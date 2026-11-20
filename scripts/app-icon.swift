@@ -5,10 +5,15 @@ import AppKit
 @main
 enum AppIcon {
     static func main() throws {
+        guard CommandLine.arguments.count == 2 else {
+            print("usage: app-icon <AppIcon.icns>")
+            exit(2)
+        }
         let output = URL(fileURLWithPath: CommandLine.arguments[1])
         let iconset = output.deletingPathExtension().appendingPathExtension("iconset")
         try? FileManager.default.removeItem(at: iconset)
         try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: iconset) }
         for points in [16, 32, 128, 256, 512] {
             for scale in [1, 2] {
                 let name = "icon_\(points)x\(points)\(scale == 2 ? "@2x" : "").png"
@@ -17,15 +22,15 @@ enum AppIcon {
         }
         let iconutil = try Process.run(URL(fileURLWithPath: "/usr/bin/iconutil"), arguments: ["-c", "icns", "-o", output.path, iconset.path])
         iconutil.waitUntilExit()
-        try FileManager.default.removeItem(at: iconset)
-        if iconutil.terminationStatus != 0 { exit(iconutil.terminationStatus) }
+        // A throw, unlike exit(), still runs the defer that removes the iconset.
+        if iconutil.terminationStatus != 0 { throw CocoaError(.fileWriteUnknown) }
     }
 
     /// The preview's 1024 canvas, y down: the macOS 824 grid squircle and the figure scaled into it.
     static func png(pixels: Int) throws -> Data {
         let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
                                       samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-                                      bytesPerRow: 0, bitsPerPixel: 0)!
+                                      bytesPerRow: 0, bitsPerPixel: 0)!.retagging(with: .sRGB)!
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
         let canvas = NSAffineTransform()

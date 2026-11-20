@@ -69,6 +69,18 @@ func downloadStartedWithAudioDiscardsIt(activity: AppState.Activity) {
     #expect(effects == [.stopRecording, .transcribe])
 }
 
+@Test func fnHeldPastThresholdWhileRecordingPlaysStartSound() {
+    let (state, effects) = recording.handling(.fnHeldPastThreshold)
+    #expect(state == recording)
+    #expect(effects == [.playStartSound])
+}
+
+/// A tap already released, hands-free (sounded when it began) and transcribing stay silent.
+@Test(arguments: [afterTap, handsFree, transcribing])
+func fnHeldPastThresholdOutsideRecordingIsSilent(state: AppState) {
+    #expect(state.handling(.fnHeldPastThreshold) == (state, []))
+}
+
 @Test(arguments: [299, 300])
 func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     let (state, effects) = recording.handling(.fnReleased(heldFor: .milliseconds(ms)))

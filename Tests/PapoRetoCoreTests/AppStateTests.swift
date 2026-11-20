@@ -10,9 +10,20 @@ private let downloading = AppState(model: .downloading)
 
 @Test func everyStateHasADistinctIcon() {
     let shown = [AppState(), ready, AppState(model: .unavailable), downloading, recording, transcribing]
-    let icons = shown.map(\.iconName)
-    #expect(!icons.contains(""))
-    #expect(Set(icons).count == shown.count)
+    #expect(Set(shown.map(\.icon)).count == shown.count)
+}
+
+@Test func idleWithModelReadyShowsTheProfile() {
+    #expect(ready.icon == .ready)
+}
+
+@Test func recordingAndHandsFreeShowTheListeningProfile() {
+    #expect(recording.icon == .listening)
+    #expect(handsFree.icon == .listening)
+}
+
+@Test func transcribingShowsTheThinkingProfile() {
+    #expect(transcribing.icon == .thinking)
 }
 
 @Test func modelLoadedWhileLoadingGoesReady() {
@@ -92,7 +103,7 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
 @Test func fnPressedUnder400msAfterATapStartsHandsFreeWithTheStartSound() {
     let (state, effects) = afterTap.handling(.fnPressed(sinceRelease: .milliseconds(399)))
     #expect(state == handsFree)
-    #expect(state.iconName == recording.iconName)
+    #expect(state.icon == recording.icon)
     #expect(effects == [.playStartSound, .startRecording])
 }
 
@@ -149,7 +160,7 @@ func transcribedWithFootprintFrom900MBReloadsTheModel(footprintMB: Double) {
 @Test func fnPressedWhileLoadingStartsRecording() {
     let (state, effects) = AppState().handling(.fnPressed(sinceRelease: nil))
     #expect(state == AppState(model: .loading, activity: .recording))
-    #expect(state.iconName == recording.iconName)
+    #expect(state.icon == recording.icon)
     #expect(effects == [.startRecording])
 }
 

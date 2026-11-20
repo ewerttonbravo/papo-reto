@@ -15,7 +15,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var fnMonitor: FnKeyMonitor?
     private let recorder = AudioRecorder()
     private var pendingSamples: [Float] = []
-    private var recordingLimit: Task<Void, Never>?
+    /// Sends fnHeldPastThreshold, then recordingLimitReached; cancelled when the recording ends.
+    private var recordingTimer: Task<Void, Never>?
     /// Download progress, or Retry after a failure.
     private let modelItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let microphoneMenu = NSMenu()
@@ -167,14 +168,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .startRecording:
             // Nothing saved means the default: skip asking Core Audio on every Fn press.
             recorder.start(from: savedMicrophone == nil ? nil : currentMicrophone(among: AudioDevices.inputs()))
-            recordingLimit = Task { [weak self] in
-                try? await Task.sleep(for: AppState.recordingLimit)
-                // A cancel can land after the sleep ends; without this, a stale timer stops the next recording.
+            recordingTimer = Task { [weak self] in
+                try? await Task.sleep(for: AppState.holdThreshold)
+                // A cancel can land after the sleep ends; without this, a stale timer acts on the next recording.
                 guard !Task.isCancelled else { return }
+                self?.handle(.fnHeldPastThreshold)
+                try? await Task.sleep(for: AppState.recordingLimit - AppState.holdThreshold)
+                guard !Task.isCancelled else { return }
+                log.info("recording limit reached")
                 self?.handle(.recordingLimitReached)
             }
-        case .stopRecording: recordingLimit?.cancel(); pendingSamples = recorder.stop()
-        case .discardRecording: recordingLimit?.cancel(); _ = recorder.stop(); pendingSamples = []
+        case .stopRecording: recordingTimer?.cancel(); pendingSamples = recorder.stop()
+        case .discardRecording: recordingTimer?.cancel(); _ = recorder.stop(); pendingSamples = []
         case .transcribe: transcribe()
         case .reloadModel:
             log.info("reloading the model to give its RAM back")

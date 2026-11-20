@@ -12,7 +12,7 @@ enum Artwork {
         case ("icns", let output?): try icns(output)
         case ("showcase", let output?): try showcase(output)
         default:
-            print("usage: artwork icns <AppIcon.icns> | artwork showcase <dir>")
+            FileHandle.standardError.write(Data("usage: artwork icns <AppIcon.icns> | artwork showcase <dir>\n".utf8))
             exit(2)
         }
     }

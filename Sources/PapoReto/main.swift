@@ -183,11 +183,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             prepareModel(hashing: false)
         // Retry hashes: a same-size corrupt file passes the size check and would fail again.
         case .prepareModel: prepareModel(hashing: true)
-        case .alertRecordingLimit:
-            log.info("recording limit reached")
-            NSSound(named: "Tink")?.play()
         // Bottle: the microphone records it, and in the T13 spike it was the only one that kept the first word.
         case .playStartSound: play("Bottle")
+        // The microphone is already off: any sound will do.
+        case .playStopSound: play("Pop")
         }
     }
 

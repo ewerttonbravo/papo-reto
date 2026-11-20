@@ -186,7 +186,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .alertRecordingLimit:
             log.info("recording limit reached")
             NSSound(named: "Tink")?.play()
+        // Bottle: the microphone records it, and in the T13 spike it was the only one that kept the first word.
+        case .playStartSound: play("Bottle")
         }
+    }
+
+    /// From the start even when still playing: play() on a playing NSSound does nothing.
+    private func play(_ systemSound: String) {
+        guard let sound = NSSound(named: systemSound) else { return }
+        sound.stop()
+        sound.play()
     }
 
     /// The Core asks for `.transcribe` only with the model ready, one transcription at a time.

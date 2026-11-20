@@ -9,12 +9,15 @@ public enum AppEvent: Sendable, Equatable {
     /// nil on the first press since launch.
     case fnPressed(sinceRelease: Duration?)
     case fnReleased(heldFor: Duration)
+    /// The adapter's timer: Fn still held `holdThreshold` after the press, so it is dictation.
+    case fnHeldPastThreshold
     case transcribed(footprintMB: Double)
 }
 
 /// What the adapters must do after a transition.
 public enum AppEffect: Sendable, Equatable {
     case startRecording, stopRecording, discardRecording, transcribe, reloadModel, alertRecordingLimit
+    case playStartSound
     /// Check every file's SHA-256 (Retry: the launch checks sizes), download what fails, then load.
     case prepareModel
 }
@@ -87,6 +90,8 @@ public struct AppState: Sendable, Equatable {
             next.activity = doubleTap ? .handsFree : .recording
             next.afterTap = false
             return (next, [.startRecording])
+        case (.fnHeldPastThreshold, _, .recording):
+            return (self, [.playStartSound])
         case (.fnReleased(let held), _, .recording):
             guard held > Self.holdThreshold else {
                 next.activity = .idle

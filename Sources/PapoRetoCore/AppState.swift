@@ -62,15 +62,17 @@ public struct AppState: Sendable, Equatable {
         self.afterTap = afterTap
     }
 
-    /// SF Symbol shown in the menu bar.
-    public var iconName: String {
+    /// The profile for the dictation states; the rare ones keep a system symbol in the adapter.
+    public enum MenuIcon: Sendable { case ready, listening, thinking, loading, downloading, unavailable }
+
+    public var icon: MenuIcon {
         switch (activity, model) {
-        case (.recording, _), (.handsFree, _): "mic.fill"
-        case (.transcribing, _): "ellipsis.bubble"
-        case (.idle, .loading): "hourglass"
-        case (.idle, .downloading): "arrow.down.circle"
-        case (.idle, .ready): "mic"
-        case (.idle, .unavailable): "exclamationmark.triangle"
+        case (.recording, _), (.handsFree, _): .listening
+        case (.transcribing, _): .thinking
+        case (.idle, .loading): .loading
+        case (.idle, .downloading): .downloading
+        case (.idle, .ready): .ready
+        case (.idle, .unavailable): .unavailable
         }
     }
 

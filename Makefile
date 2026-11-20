@@ -69,14 +69,21 @@ DEV_CERT ?= Papo Reto Dev
 SIGN ?=
 
 .PHONY: app run
-app: $(SHERPA_LIB) $(VAD_MODEL) $(ORT_NOTICES)
+# Drawn by the app's own ProfileGlyph.swift, so the menu bar and the app icon never drift apart.
+ICON := build/AppIcon.icns
+$(ICON): Sources/PapoReto/ProfileGlyph.swift scripts/app-icon.swift
+	mkdir -p build
+	swiftc -parse-as-library -O $^ -o build/app-icon
+	build/app-icon $@
+
+app: $(SHERPA_LIB) $(VAD_MODEL) $(ORT_NOTICES) $(ICON)
 	swift build -c release --arch $(PAPO_ARCH) --product PapoReto
 	rm -rf build/PapoReto.app
 	mkdir -p build/PapoReto.app/Contents/MacOS
 	cp "$$(swift build -c release --arch $(PAPO_ARCH) --show-bin-path)/PapoReto" build/PapoReto.app/Contents/MacOS/
 	cp Resources/Info.plist build/PapoReto.app/Contents/
 	mkdir -p build/PapoReto.app/Contents/Resources
-	cp $(VAD_MODEL) $(NOTICES) build/PapoReto.app/Contents/Resources/
+	cp $(VAD_MODEL) $(NOTICES) $(ICON) build/PapoReto.app/Contents/Resources/
 	mkdir -p build/PapoReto.app/Contents/Frameworks
 	cp $(BUNDLED_LIBS) build/PapoReto.app/Contents/Frameworks/
 	@# The repo's vendor/ rpath would hide a broken bundle on this Mac.

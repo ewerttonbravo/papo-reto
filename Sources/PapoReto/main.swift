@@ -298,9 +298,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         UserDefaults.standard.set(sender.representedObject as? String, forKey: Self.microphoneKey)
     }
 
-    private func render() {
-        let image = NSImage(systemSymbolName: state.iconName, accessibilityDescription: "Papo Reto")
+    private static func image(for icon: AppState.MenuIcon) -> NSImage? {
+        let symbol: String
+        switch icon {
+        case .ready: return ProfileGlyph.menuBarImage(.none)
+        case .listening: return ProfileGlyph.menuBarImage(.waves)
+        case .thinking: return ProfileGlyph.menuBarImage(.dots)
+        case .loading: symbol = "hourglass"
+        case .downloading: symbol = "arrow.down.circle"
+        case .unavailable: symbol = "exclamationmark.triangle"
+        }
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Papo Reto")
         image?.isTemplate = true
+        return image
+    }
+
+    private func render() {
+        let image = Self.image(for: state.icon)
         statusItem?.button?.image = image
         // An unknown symbol name yields nil: show text so the menu (and "Quit") stays reachable.
         statusItem?.button?.title = image == nil ? "PR" : ""

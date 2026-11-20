@@ -24,6 +24,9 @@ rpaths() {
 failed=0
 fail() { echo "$(basename "$image"): $1" >&2; failed=1; }
 
+icon="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")"
+[ -f "$app/Contents/Resources/${icon%.icns}.icns" ] || { echo "Info.plist names the icon $icon, missing from Resources" >&2; failed=1; }
+
 for image in "$exe" "$frameworks"/*.dylib; do
   [ -f "$image" ] || continue
   while IFS= read -r dir; do

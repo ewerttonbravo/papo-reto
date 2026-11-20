@@ -299,13 +299,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private static func image(for icon: AppState.MenuIcon) -> NSImage? {
-        let symbol = switch icon {
-        case .ready: "mic"
-        case .listening: "mic.fill"
-        case .thinking: "ellipsis.bubble"
-        case .loading: "hourglass"
-        case .downloading: "arrow.down.circle"
-        case .unavailable: "exclamationmark.triangle"
+        let symbol: String
+        switch icon {
+        case .ready: return ProfileGlyph.menuBarImage(.none)
+        case .listening: return ProfileGlyph.menuBarImage(.waves)
+        case .thinking: return ProfileGlyph.menuBarImage(.dots)
+        case .loading: symbol = "hourglass"
+        case .downloading: symbol = "arrow.down.circle"
+        case .unavailable: symbol = "exclamationmark.triangle"
         }
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Papo Reto")
         image?.isTemplate = true

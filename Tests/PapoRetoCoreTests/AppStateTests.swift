@@ -63,10 +63,10 @@ func downloadStartedWithAudioDiscardsIt(activity: AppState.Activity) {
     #expect(effects == [.startRecording])
 }
 
-@Test func fnHeldOver300msStopsAndTranscribes() {
+@Test func fnHeldOver300msStopsWithTheStopSoundAndTranscribes() {
     let (state, effects) = recording.handling(.fnReleased(heldFor: .milliseconds(301)))
     #expect(state == transcribing)
-    #expect(effects == [.stopRecording, .transcribe])
+    #expect(effects == [.stopRecording, .playStopSound, .transcribe])
 }
 
 @Test func fnHeldPastThresholdWhileRecordingPlaysStartSound() {
@@ -108,16 +108,16 @@ func fnHeldUpTo300msDiscardsTheRecording(ms: Int) {
     #expect(effects == [.startRecording])
 }
 
-@Test func fnPressedInHandsFreeStopsAndTranscribes() {
+@Test func fnPressedInHandsFreeStopsWithTheStopSoundAndTranscribes() {
     let (state, effects) = handsFree.handling(.fnPressed(sinceRelease: .seconds(5)))
     #expect(state == transcribing)
-    #expect(effects == [.stopRecording, .transcribe])
+    #expect(effects == [.stopRecording, .playStopSound, .transcribe])
 }
 
 @Test func fnPressedInHandsFreeWhileLoadingWaitsForTheModel() {
     let (state, effects) = AppState(model: .loading, activity: .handsFree).handling(.fnPressed(sinceRelease: .seconds(5)))
     #expect(state == AppState(model: .loading, activity: .transcribing))
-    #expect(effects == [.stopRecording])
+    #expect(effects == [.stopRecording, .playStopSound])
 }
 
 @Test(arguments: [100, 300])
@@ -127,10 +127,10 @@ func fnTappedInHandsFreeKeepsRecording(ms: Int) {
     #expect(effects.isEmpty)
 }
 
-@Test func fnHeldOver300msInHandsFreeStopsAndTranscribes() {
+@Test func fnHeldOver300msInHandsFreeStopsWithTheStopSoundAndTranscribes() {
     let (state, effects) = handsFree.handling(.fnReleased(heldFor: .milliseconds(301)))
     #expect(state == transcribing)
-    #expect(effects == [.stopRecording, .transcribe])
+    #expect(effects == [.stopRecording, .playStopSound, .transcribe])
 }
 
 @Test func transcribedWithFootprintUnder900MBKeepsTheModel() {
@@ -157,7 +157,7 @@ func transcribedWithFootprintFrom900MBReloadsTheModel(footprintMB: Double) {
     let (state, effects) = AppState(model: .loading, activity: .recording)
         .handling(.fnReleased(heldFor: .milliseconds(301)))
     #expect(state == AppState(model: .loading, activity: .transcribing))
-    #expect(effects == [.stopRecording])
+    #expect(effects == [.stopRecording, .playStopSound])
 }
 
 @Test func modelLoadedWithPendingAudioTranscribes() {
@@ -181,16 +181,16 @@ func fnIgnoredWhenModelUnavailableOrTranscribing(state: AppState) {
 }
 
 @Test(arguments: [recording, handsFree])
-func recordingLimitStopsTranscribesAndAlerts(state: AppState) {
+func recordingLimitStopsWithTheStopSoundAndTranscribes(state: AppState) {
     let (state, effects) = state.handling(.recordingLimitReached)
     #expect(state == transcribing)
-    #expect(effects == [.stopRecording, .alertRecordingLimit, .transcribe])
+    #expect(effects == [.stopRecording, .playStopSound, .transcribe])
 }
 
 @Test func recordingLimitWhileLoadingWaitsForTheModel() {
     let (state, effects) = AppState(model: .loading, activity: .recording).handling(.recordingLimitReached)
     #expect(state == AppState(model: .loading, activity: .transcribing))
-    #expect(effects == [.stopRecording, .alertRecordingLimit])
+    #expect(effects == [.stopRecording, .playStopSound])
 }
 
 @Test(arguments: [ready, transcribing])

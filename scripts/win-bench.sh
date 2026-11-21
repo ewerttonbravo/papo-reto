@@ -35,6 +35,12 @@ foreach (\$e in @(${sizes%,})) { \$p = Join-Path '$remote_model' \$e[0]
 for f in $missing; do
 	echo "== copying the model's $f"
 	scp -q -i "$WIN_KEY" "$model/$f" "$WIN_HOST:${remote_model//\\//}/$f"
+	# Against the Mac's copy, verified on download by fetch-deps.sh or ModelStore; a bad copy is removed, so a rerun copies it again.
+	remote_sha=$(winps "(Get-FileHash -Algorithm SHA256 '$remote_model\\$f').Hash")
+	if [ "$(echo "$remote_sha" | tr A-F a-f)" != "$(shasum -a 256 "$model/$f" | cut -d' ' -f1)" ]; then
+		winps "Remove-Item -Force '$remote_model\\$f'"
+		echo "SHA-256 mismatch after copying $f; run make win-bench again"; exit 1
+	fi
 done
 
 echo "== copying the bench ($(du -h "$out/bench.zip" | cut -f1))"
@@ -47,6 +53,7 @@ try {
 	Set-Location \$dir\\papo-reto-bench
 	foreach (\$run in 1..3) {
 		Write-Output \"== run \$run/3\"
+		\$LASTEXITCODE = -1  # an exe that cannot start leaves the previous run's 0
 		& .\\papo-reto-bench.exe --reference mac.txt \$wavs
 		if (\$LASTEXITCODE -ne 0) { \$failed++ }
 	}

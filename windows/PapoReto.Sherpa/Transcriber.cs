@@ -17,6 +17,9 @@ public sealed class Transcriber
     public Transcriber(string? modelDir = null)
     {
         var dir = modelDir ?? DefaultModelDir;
+        // The NuGet does not check the native handle: a missing file would crash later, in native code.
+        foreach (var f in new[] { "encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt" })
+            if (!File.Exists(Path.Combine(dir, f))) throw new FileNotFoundException($"No {f} in {dir}");
         var config = new OfflineRecognizerConfig();
         config.FeatConfig.SampleRate = 16000;
         config.FeatConfig.FeatureDim = 80;

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using PapoReto.Core;
 using PapoReto.Sherpa;
 
@@ -45,13 +46,14 @@ return 3;
 static (int rate, float[] samples) ReadWav(string path)
 {
     using var r = new BinaryReader(File.OpenRead(path));
-    if (new string(r.ReadChars(4)) != "RIFF") throw new InvalidDataException(path);
+    string Id() => Encoding.ASCII.GetString(r.ReadBytes(4));
+    if (Id() != "RIFF") throw new InvalidDataException(path);
     r.ReadInt32();
-    if (new string(r.ReadChars(4)) != "WAVE") throw new InvalidDataException(path);
+    if (Id() != "WAVE") throw new InvalidDataException(path);
     int rate = 0;
     while (true)
     {
-        var id = new string(r.ReadChars(4));
+        var id = Id();
         var size = r.ReadInt32();
         if (id == "fmt ")
         {
@@ -61,7 +63,7 @@ static (int rate, float[] samples) ReadWav(string path)
             r.ReadBytes(6);
             var bits = r.ReadInt16();
             if (format != 1 || channels != 1 || bits != 16) throw new InvalidDataException($"{path}: not 16-bit PCM mono");
-            r.ReadBytes(size - 16);
+            r.ReadBytes(size - 16 + (size & 1));
         }
         else if (id == "data")
         {
@@ -70,6 +72,6 @@ static (int rate, float[] samples) ReadWav(string path)
             for (int i = 0; i < samples.Length; i++) samples[i] = BitConverter.ToInt16(bytes, i * 2) / 32768f;
             return (rate, samples);
         }
-        else r.ReadBytes(size);
+        else r.ReadBytes(size + (size & 1));  // RIFF pads odd-sized chunks
     }
 }

@@ -47,13 +47,13 @@ endif
 BENCH_AUDIO ?= ../papo-reto-docs/bench/audio
 BENCH_PHRASE := Bom dia, pessoal. Hoje eu quero falar sobre como a inteligência artificial pode ajudar \
 	pequenas empresas a vender mais, sem gastar muito com ferramentas caras.
+SAY_BENCH_PHRASE = mkdir -p build && say -v Luciana -o build/luciana.wav --data-format=LEI16@16000 "$(BENCH_PHRASE)"
 
 .PHONY: bench
 bench: $(SHERPA_LIB)
 	swift build -c release --product papo-reto-bench
 	@ls "$(BENCH_AUDIO)"/*.wav >/dev/null 2>&1 || { echo "No WAVs in BENCH_AUDIO=$(BENCH_AUDIO)"; exit 1; }
-	mkdir -p build
-	say -v Luciana -o build/luciana.wav --data-format=LEI16@16000 "$(BENCH_PHRASE)"
+	$(SAY_BENCH_PHRASE)
 	@# Latency jumps with CPU bursts from other apps (0.8 -> 2.8 s per 10 s on the same WAVs), so the majority of 3 decides.
 	@BIN="$$(swift build -c release --show-bin-path)/papo-reto-bench"; pass=0; \
 	for run in 1 2 3; do \
@@ -151,11 +151,24 @@ ifdef FILTER
 else
 	$(DOTNET) test windows/PapoReto.Core.Tests -p:CollectCoverage=true -p:Include='[PapoReto.Core]*' \
 		-p:Threshold=100 -p:ThresholdType=line -p:CoverletOutput='$(CURDIR)/build/windows/'
-	@# The tray app has no tests, but it must still compile.
+	@# The tray app and the bench have no tests, but they must still compile.
 	$(DOTNET) build windows/PapoReto
+	$(DOTNET) build windows/PapoReto.Bench
 endif
 
 # Self-contained folder; whether it ships as a folder or a single .exe is decided in W09.
 win-app:
 	rm -rf build/windows/PapoReto
 	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -o build/windows/PapoReto
+
+# On the Windows test notebook (ADR-028): reports numbers, fails only when the text differs from the Mac's.
+WIN_HOST ?= icmsa@172.16.0.116
+WIN_KEY ?= $(HOME)/.ssh/notebook_win_ed25519
+
+.PHONY: win-bench
+win-bench: $(SHERPA_LIB)
+	swift build -c release --product papo-reto-bench
+	@ls "$(BENCH_AUDIO)"/*.wav >/dev/null 2>&1 || { echo "No WAVs in BENCH_AUDIO=$(BENCH_AUDIO)"; exit 1; }
+	$(SAY_BENCH_PHRASE)
+	DOTNET='$(DOTNET)' WIN_HOST='$(WIN_HOST)' WIN_KEY='$(WIN_KEY)' scripts/win-bench.sh \
+		"$$(swift build -c release --show-bin-path)/papo-reto-bench" build/luciana.wav "$(BENCH_AUDIO)"/*.wav

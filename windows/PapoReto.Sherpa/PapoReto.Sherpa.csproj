@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Transcriber the bench and the app share, like PapoRetoSherpa on the Mac. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Same version as vendor/ (ADR-027): with 1.13.4 the text changed in 3 of 5 WAVs. -->
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="2.0.1" />
+  </ItemGroup>
+</Project>

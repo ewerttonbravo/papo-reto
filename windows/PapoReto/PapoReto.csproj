@@ -12,4 +12,8 @@
     <ProjectReference Include="../PapoReto.Core/PapoReto.Core.csproj" />
     <ProjectReference Include="../PapoReto.Sherpa/PapoReto.Sherpa.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- WASAPI capture with Windows converting to 16 kHz mono; its MMDevice IDs serve W05. -->
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+  </ItemGroup>
 </Project>

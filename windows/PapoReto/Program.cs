@@ -42,6 +42,7 @@ sealed class TrayContext : ApplicationContext
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
         tray.ContextMenuStrip = menu;
         Render();
+        recorder.Failed += () => Apply(new AppEvent.RecordingFailed());
         try
         {
             hotkey = new HotkeyMonitor(() => Apply(new AppEvent.HotkeyPressed()), held => Apply(new AppEvent.HotkeyReleased(held)));
@@ -109,8 +110,9 @@ sealed class TrayContext : ApplicationContext
     {
         try
         {
-            var samples = await audio;
+            // From the stop, so the device's last buffer counts in what the user waits.
             var clock = Stopwatch.StartNew();
+            var samples = await audio;
             var text = await Task.Run(() => transcriber!.Transcribe(samples, AudioRecorder.SampleRate));
             Log.Write("dictation", $"{(double)samples.Length / AudioRecorder.SampleRate:F2} s of audio transcribed in {clock.Elapsed.TotalSeconds:F2} s");
             // Back on the UI thread, which is STA as the clipboard requires.

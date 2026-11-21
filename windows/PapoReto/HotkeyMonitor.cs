@@ -7,7 +7,7 @@ namespace PapoReto;
 sealed class HotkeyMonitor : IDisposable
 {
     const int WH_KEYBOARD_LL = 13;
-    const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105;
+    const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105, WM_QUIT = 0x0012;
     const uint VK_RCONTROL = 0xA3;
 
     readonly SynchronizationContext ui = SynchronizationContext.Current!;
@@ -15,7 +15,8 @@ sealed class HotkeyMonitor : IDisposable
     readonly Action<TimeSpan> released;
     // Retained: native code holds the only other reference, which the GC does not see.
     readonly HookProc proc;
-    readonly IntPtr hook;
+    IntPtr hook;
+    uint threadId;
     // The event time of the press; null while up, which also drops the keyboard's auto-repeat.
     uint? downAt;
 
@@ -24,8 +25,19 @@ sealed class HotkeyMonitor : IDisposable
         this.pressed = pressed;
         this.released = released;
         proc = Callback;
-        hook = SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(null), 0);
-        if (hook == IntPtr.Zero) throw new Win32Exception();
+        // Windows calls the hook on the installing thread, and every key in the system waits for it:
+        // a thread of its own keeps the UI's slow work (microphone start, clipboard) out of typing.
+        var installed = new TaskCompletionSource<int>();
+        new Thread(() =>
+        {
+            threadId = GetCurrentThreadId();
+            hook = SetWindowsHookEx(WH_KEYBOARD_LL, proc, GetModuleHandle(null), 0);
+            installed.SetResult(hook == IntPtr.Zero ? Marshal.GetLastWin32Error() : 0);
+            if (hook == IntPtr.Zero) return;
+            while (GetMessage(out _, IntPtr.Zero, 0, 0) > 0) { }
+            UnhookWindowsHookEx(hook);
+        }) { IsBackground = true, Name = "hotkey" }.Start();
+        if (installed.Task.Result is var error and not 0) throw new Win32Exception(error);
     }
 
     // Windows silently removes a hook that is slow to return, so the work goes to the UI queue.
@@ -51,7 +63,7 @@ sealed class HotkeyMonitor : IDisposable
         return CallNextHookEx(hook, code, message, data);
     }
 
-    public void Dispose() => UnhookWindowsHookEx(hook);
+    public void Dispose() => PostThreadMessage(threadId, WM_QUIT, IntPtr.Zero, IntPtr.Zero);
 
     delegate IntPtr HookProc(int code, IntPtr message, IntPtr data);
 
@@ -62,6 +74,16 @@ sealed class HotkeyMonitor : IDisposable
         public UIntPtr dwExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct MSG
+    {
+        public IntPtr hwnd;
+        public uint message;
+        public IntPtr wParam, lParam;
+        public uint time;
+        public int x, y, lPrivate;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     static extern IntPtr SetWindowsHookEx(int idHook, HookProc proc, IntPtr module, uint threadId);
 
@@ -70,6 +92,15 @@ sealed class HotkeyMonitor : IDisposable
 
     [DllImport("user32.dll")]
     static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
+
+    [DllImport("user32.dll")]
+    static extern int GetMessage(out MSG msg, IntPtr hwnd, uint min, uint max);
+
+    [DllImport("user32.dll")]
+    static extern bool PostThreadMessage(uint threadId, int message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll")]
+    static extern uint GetCurrentThreadId();
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     static extern IntPtr GetModuleHandle(string? name);

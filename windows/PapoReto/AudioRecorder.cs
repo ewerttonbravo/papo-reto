@@ -11,6 +11,9 @@ sealed class AudioRecorder
     WasapiCapture? capture;
     Task<float[]> stopped = Task.FromResult(Array.Empty<float>());
 
+    /// <summary>The device failed after Start returned (capture thread errors, a device lost at once); on the UI thread.</summary>
+    public event Action? Failed;
+
     /// <summary>Throws when there is no microphone or Windows privacy settings block it.</summary>
     public void Start()
     {
@@ -28,7 +31,12 @@ sealed class AudioRecorder
         c.RecordingStopped += (_, e) =>
         {
             c.Dispose();
-            if (e.Exception is not null) Log.Write("audio", $"Recording stopped by an error: {e.Exception.Message}");
+            if (e.Exception is not null)
+            {
+                Log.Write("audio", $"Recording stopped by an error: {e.Exception.Message}");
+                // Still recording for the Core: without this the icon would listen to nothing.
+                if (capture == c) { capture = null; Failed?.Invoke(); }
+            }
             lock (samples) done.SetResult(samples.ToArray());
         };
         try { c.StartRecording(); }

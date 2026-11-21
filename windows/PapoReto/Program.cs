@@ -50,16 +50,16 @@ sealed class TrayContext : ApplicationContext
         catch (Exception e)
         {
             Log.Write("model", $"Load failed after {clock.Elapsed.TotalSeconds:F2} s: {e.Message}");
-            Apply(AppEvent.ModelFailed);
+            Apply(new AppEvent.ModelFailed());
             return;
         }
         Log.Write("model", $"Loaded in {clock.Elapsed.TotalSeconds:F2} s, {transcriber.Threads} threads");
-        Apply(AppEvent.ModelLoaded);
+        Apply(new AppEvent.ModelLoaded());
     }
 
     void Apply(AppEvent e)
     {
-        state = state.Handling(e);
+        (state, _) = state.Handling(e);
         Render();
     }
 

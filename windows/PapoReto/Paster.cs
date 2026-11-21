@@ -5,13 +5,15 @@ using PapoReto.Core;
 
 namespace PapoReto;
 
-/// <summary>The Win32 clipboard; the snapshot copies every memory format in the original order. GDI handle formats are
-/// skipped: Windows synthesizes the bitmap from the DIB.</summary>
+/// <summary>The Win32 clipboard; the snapshot copies every memory format and the EMF in the original order. The other
+/// GDI handles are skipped: Windows synthesizes the bitmap from the DIB and the old metafile from the EMF.</summary>
 sealed class WindowsClipboard : IClipboard<List<(uint Format, byte[] Data)>>, IDisposable
 {
-    const uint CF_UNICODETEXT = 13, GMEM_MOVEABLE = 2;
-    // CF_BITMAP, CF_METAFILEPICT, CF_PALETTE, CF_ENHMETAFILE, CF_OWNERDISPLAY, CF_DSPBITMAP, CF_DSPMETAFILEPICT, CF_DSPENHMETAFILE.
-    static readonly HashSet<uint> Handles = [2, 3, 9, 14, 0x80, 0x82, 0x83, 0x8E];
+    const uint CF_UNICODETEXT = 13, CF_ENHMETAFILE = 14, GMEM_MOVEABLE = 2;
+    // CF_BITMAP, CF_METAFILEPICT, CF_PALETTE, CF_OWNERDISPLAY, CF_DSPBITMAP, CF_DSPMETAFILEPICT, CF_DSPENHMETAFILE, and the
+    // source app's live OLE object, which written back as bytes would describe data that is no longer there.
+    static readonly HashSet<uint> Skipped =
+        [2, 3, 9, 0x80, 0x82, 0x83, 0x8E, RegisterClipboardFormat("DataObject"), RegisterClipboardFormat("Ole Private Data")];
     // Password managers mark their copies with it; Ditto and other managers skip what carries it.
     static readonly uint Exclude = RegisterClipboardFormat("ExcludeClipboardContentFromMonitorProcessing");
     static readonly uint History = RegisterClipboardFormat("CanIncludeInClipboardHistory");
@@ -34,8 +36,9 @@ sealed class WindowsClipboard : IClipboard<List<(uint Format, byte[] Data)>>, ID
             for (var format = EnumClipboardFormats(0); format != 0; format = EnumClipboardFormats(format))
             {
                 // The private and GDI object ranges hold handles the system does not describe.
-                if (Handles.Contains(format) || format is >= 0x200 and <= 0x3FF) continue;
-                if (Copy(GetClipboardData(format)) is { } data) formats.Add((format, data));
+                if (Skipped.Contains(format) || format is >= 0x200 and <= 0x3FF) continue;
+                var handle = GetClipboardData(format);
+                if ((format == CF_ENHMETAFILE ? MetafileBits(handle) : Copy(handle)) is { } data) formats.Add((format, data));
             }
         }
         finally { CloseClipboard(); }
@@ -52,24 +55,37 @@ sealed class WindowsClipboard : IClipboard<List<(uint Format, byte[] Data)>>, ID
 
     public void Dispose() => window.DestroyHandle();
 
+    // Allocated before emptying, so a failed allocation or a busy clipboard leaves it as it was.
     void Write(List<(uint Format, byte[] Data)> formats)
     {
-        Open();
+        var handles = new List<(uint Format, IntPtr Handle)>();
+        try
+        {
+            foreach (var (format, data) in formats) handles.Add((format, Allocate(format, data)));
+            Open();
+        }
+        catch
+        {
+            handles.ForEach(Free);
+            throw;
+        }
         try
         {
             EmptyClipboard();
-            foreach (var (format, data) in formats) Set(format, data);
+            // The system owns each handle it takes; one it refuses is freed and the others still go.
+            foreach (var handle in handles)
+                if (SetClipboardData(handle.Format, handle.Handle) == IntPtr.Zero) Free(handle);
         }
         finally { CloseClipboard(); }
     }
 
-    // Clipboard managers open it for a moment after every copy, ours included.
+    // Clipboard managers open it for a moment after every copy, ours included. 10 x 100 ms, as WinForms retries.
     void Open()
     {
         for (var attempt = 1; !OpenClipboard(window.Handle); attempt++)
         {
-            if (attempt == 5) throw new Win32Exception();
-            Thread.Sleep(10);
+            if (attempt == 10) throw new Win32Exception();
+            Thread.Sleep(100);
         }
     }
 
@@ -86,17 +102,39 @@ sealed class WindowsClipboard : IClipboard<List<(uint Format, byte[] Data)>>, ID
         finally { GlobalUnlock(handle); }
     }
 
-    static void Set(uint format, byte[] data)
+    static byte[]? MetafileBits(IntPtr metafile)
     {
+        var size = GetEnhMetaFileBits(metafile, 0, null);
+        if (size == 0) return null;
+        var data = new byte[size];
+        return GetEnhMetaFileBits(metafile, size, data) == size ? data : null;
+    }
+
+    static IntPtr Allocate(uint format, byte[] data)
+    {
+        if (format == CF_ENHMETAFILE)
+        {
+            var metafile = SetEnhMetaFileBits((uint)data.Length, data);
+            return metafile != IntPtr.Zero ? metafile : throw new Win32Exception();
+        }
         var handle = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)Math.Max(data.Length, 1));
         if (handle == IntPtr.Zero) throw new Win32Exception();
-        Marshal.Copy(data, 0, GlobalLock(handle), data.Length);
+        var target = GlobalLock(handle);
+        if (target == IntPtr.Zero)
+        {
+            var error = new Win32Exception();
+            GlobalFree(handle);
+            throw error;
+        }
+        Marshal.Copy(data, 0, target, data.Length);
         GlobalUnlock(handle);
-        // The system owns the memory once SetClipboardData succeeds.
-        if (SetClipboardData(format, handle) != IntPtr.Zero) return;
-        var error = new Win32Exception();
-        GlobalFree(handle);
-        throw error;
+        return handle;
+    }
+
+    static void Free((uint Format, IntPtr Handle) handle)
+    {
+        if (handle.Format == CF_ENHMETAFILE) DeleteEnhMetaFile(handle.Handle);
+        else GlobalFree(handle.Handle);
     }
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -137,6 +175,15 @@ sealed class WindowsClipboard : IClipboard<List<(uint Format, byte[] Data)>>, ID
 
     [DllImport("kernel32.dll")]
     static extern UIntPtr GlobalSize(IntPtr handle);
+
+    [DllImport("gdi32.dll")]
+    static extern uint GetEnhMetaFileBits(IntPtr metafile, uint size, byte[]? data);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    static extern IntPtr SetEnhMetaFileBits(uint size, byte[] data);
+
+    [DllImport("gdi32.dll")]
+    static extern bool DeleteEnhMetaFile(IntPtr metafile);
 }
 
 /// <summary>Synthetic Ctrl+V to the focused app. Windows drops it in silence for an elevated app (UIPI).</summary>
@@ -149,7 +196,9 @@ sealed class WindowsKeyboard : IKeyboard
     public void PressCtrlV()
     {
         INPUT[] inputs = [Key(VK_LCONTROL, 0), Key(VK_V, 0), Key(VK_V, KEYEVENTF_KEYUP), Key(VK_LCONTROL, KEYEVENTF_KEYUP)];
-        if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>()) != inputs.Length) throw new Win32Exception();
+        // Blocked by a UAC prompt or the lock screen, it pastes nothing and the restore still runs: only the log says so.
+        if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>()) != inputs.Length)
+            Log.Write("paste", $"Ctrl+V blocked: {new Win32Exception().Message}");
     }
 
     static INPUT Key(ushort key, uint flags) => new() { type = INPUT_KEYBOARD, ki = new KEYBDINPUT { wVk = key, dwFlags = flags } };

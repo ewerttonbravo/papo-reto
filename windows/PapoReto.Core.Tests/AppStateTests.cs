@@ -35,7 +35,9 @@ public class AppStateTests
 
     [Theory]
     [InlineData(AppState.ModelState.Ready, AppEvent.ModelFailed)]
+    [InlineData(AppState.ModelState.Ready, AppEvent.ModelLoaded)]
     [InlineData(AppState.ModelState.Unavailable, AppEvent.ModelLoaded)]
+    [InlineData(AppState.ModelState.Unavailable, AppEvent.ModelFailed)]
     public void ModelEventsOutsideLoadingKeepTheState(AppState.ModelState model, AppEvent e)
     {
         var state = new AppState { Model = model };

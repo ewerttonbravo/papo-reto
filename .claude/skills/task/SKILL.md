@@ -7,9 +7,11 @@ disable-model-invocation: true
 
 # Task
 
-Which task: **$ARGUMENTS** if a number was given; otherwise the next in sequence, i.e. the first row of the task table in `../papo-reto-docs/roadmap.md`, in table order, without a `../papo-reto-docs/tasks/NN-*.md` marked `Status: fechada`. Say in 1 line which task was picked and why.
+Which task: **$ARGUMENTS** if a number was given; otherwise the next in sequence, i.e. the first row of the task tables in `../papo-reto-docs/roadmap.md` (Mac, then Windows), in table order, without a `../papo-reto-docs/tasks/NN-*.md` marked `Status: fechada`. Say in 1 line which task was picked and why.
 
 Deliver that task from `../papo-reto-docs/roadmap.md`: the smallest solution that delivers the behavior, test first, small PR. The rules in `CLAUDE.md` apply in full. Each phase ends at a gate; if the gate fails, the task stops: fix or ask, never skip.
+
+**Windows task (WNN, ADR-027/028):** read `make win-test` for `make test`, `make win-bench` for `make bench` (it reports and compares the text with the Mac bench; no budget verdict), xUnit for Swift Testing and `windows/` for the Swift targets. The manual checklist is Mr. Bravo's at the test notebook: I copy the build over SSH into a folder of its own, read the app log and delete what I copied.
 
 ## Phase 0: Elucidate (before any code)
 1. State: read `../papo-reto-docs/estado.md` and the task's row in the roadmap. Check that git is on `main`, clean and in sync (`git fetch`), and that `gh pr list` shows no open PR from another task.

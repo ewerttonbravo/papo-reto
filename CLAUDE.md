@@ -1,9 +1,9 @@
 # Papo Reto — CLAUDE.md
 
 ## Product
-Voice dictation for macOS, focused on PT-BR, 100% local and open source (MIT). Hold `Fn`, speak, release: the text appears at the cursor. A free alternative to Wispr Flow, inspired by [Arara](https://github.com/davimatosms/Arara-voice), but native and lightweight.
+Voice dictation for macOS and Windows (ADR-027), focused on PT-BR, 100% local and open source (MIT). Hold `Fn`, speak, release: the text appears at the cursor. A free alternative to Wispr Flow, inspired by [Arara](https://github.com/davimatosms/Arara-voice), but native and lightweight.
 
-MVP: menu bar (no Dock, no window), icon per state (loading / ready / recording / transcribing), menu with microphones and "Quit". Out of scope without an explicit request: Windows/Linux, cloud, model switching, history, dictionary, themes, live preview, auto-update, onboarding, configurable shortcut.
+MVP: menu bar (no Dock, no window), icon per state (loading / ready / recording / transcribing), menu with microphones and "Quit". Out of scope without an explicit request: Linux, cloud, model switching, history, dictionary, themes, live preview, auto-update, onboarding, configurable shortcut.
 
 ## Principles
 1. **Brutally simple.** A new feature must justify its existence. When in doubt, leave it out.
@@ -41,6 +41,9 @@ Swift 6 · AppKit · SwiftPM (no Xcode project, no SwiftUI, no third-party Swift
 
 The compiler prevents the Core from importing the app. Every state transition goes through the Core state machine; no adapter changes state on its own.
 
+## Windows (ADR-027, ADR-028)
+C# · .NET 10 in `windows/`, roadmap W00-W13 in `../papo-reto-docs/roadmap.md`, plans in `tasks/WNN-name.md`. `PapoReto.Core` (net10.0, no Windows API) ports the Swift Core, growing per task with only what the task uses, tests named after the same rules (xUnit). `PapoReto` (net10.0-windows, WinForms): tray app (`NotifyIcon`), Right Ctrl in place of `Fn`. Built on the Mac (`EnableWindowsTargeting`); the SDK may be in `~/.dotnet`, off the PATH, which the Makefile finds. Test notebook and its limits: `../papo-reto-docs/estado.md`; the manual checklist is Mr. Bravo's, at the notebook; there is no Windows budget yet (ADR-028).
+
 ## Known pitfalls
 - **Model:** loads in the background when the app opens; reuse the `OfflineRecognizer` and create one stream per transcription; when the footprint after a transcription reaches 900 MB the app destroys it and loads a new one (destroy first: both at once peak at ~2.4 GB), since it keeps the RAM of the longest audio it saw (app: 28.5 s → 1,005 MB); `num_threads` = `hw.physicalcpu`. Files in `~/Library/Application Support/PapoReto/Models/parakeet-tdt-0.6b-v3-int8/`; the app downloads missing or truncated files (`ModelStore`, manifest in the Core) and the bench gets them from `scripts/fetch-deps.sh model` (same SHA-256 pins, kept in both). The launch checks sizes only: CryptoKit/CommonCrypto skip the Intel SHA instructions, so hashing the encoder takes 2.3-2.6 s (openssl: ~1 s); the SHA-256 runs after each download and on Retry (a same-size corrupt file would fail again). An `Fn` press before a load finishes records normally and transcribes when the model is ready. Recording stops by itself at 2 min (sound + transcribes it whole). After each load the app calls `malloc_zone_pressure_relief(nil, 0)` (609-692 → 450 MB); not in `Transcriber`, where it pushed the bench to 899 MB (ADR-012).
 - **Audio:** the engine runs only while recording. The microphone is selected with `kAudioOutputUnitProperty_CurrentDevice` and persisted by UID, falling back to the default if the device disappears. Convert to 16 kHz mono Float32 in memory, never on disk. Recorded audio < 0.4 s skips the model (it makes words up: 0.35 s → "It was"); longer audio goes to the model only if the Silero VAD finds speech (noise → "Yeah."). The detector is created per dictation (~50 ms, no RAM at rest) and stops at the first speech; without it (`swift run`) everything is transcribed. Sounds: Bottle once the dictation is confirmed (Fn held past 300 ms, or hands-free begins), Pop on every stop to transcribe (the 2 min limit too), cancels silent. The microphone records the start sound: in the T13 spike Bottle was the only system sound that kept the first word (Tink, Pop, Purr turned "Crie" into "Tem um").
@@ -69,10 +72,11 @@ The compiler prevents the Core from importing the app. Every state transition go
 ## Gates
 - `make test`: `swift test` + 100% line coverage on `PapoRetoCore` (llvm-cov), failing the build below that.
 - `make bench` (task that touches audio or the model): text, latency and RAM of the reference WAVs; 3 runs, fails unless 2 stay within budget (load, slowest file, final footprint). Measure with Colima stopped: with it running the footprint jumps to 1,052-1,126 MB.
-- CI (GitHub Actions, macOS): `make test`.
+- `make win-test`: `dotnet test` + 100% line coverage on `PapoReto.Core` (coverlet). `make win-bench` (W01) reports and compares the text with the Mac bench, no budget verdict (ADR-028).
+- CI (GitHub Actions): `make test` on macOS (`ci.yml`, skips `windows/**`); `make win-test` on Ubuntu (`windows.yml`, only for `windows/**` and the Makefile).
 
 ## Commands
-`make test` · `make test FILTER=<Test>` (one test, no coverage; with the CLT, plain `swift test` cannot find Swift Testing) · `make app` (assembles the `.app` with the sherpa dylibs in `Contents/Frameworks`, swaps the `vendor/` rpath for it, signs and runs `scripts/check-bundle.sh`) · `make run` · `make install` (quits a running instance, copies to `/Applications` and opens) · `make bench` (real WAVs from `BENCH_AUDIO`, default `../papo-reto-docs/bench/audio`) · `make release` (ad-hoc zips for arm64, cross-compiled, and x86_64 in `build/release`, each through `scripts/check-release.sh`; the arm64 one is untested until run on Apple Silicon).
+`make test` · `make test FILTER=<Test>` (one test, no coverage; with the CLT, plain `swift test` cannot find Swift Testing) · `make app` (assembles the `.app` with the sherpa dylibs in `Contents/Frameworks`, swaps the `vendor/` rpath for it, signs and runs `scripts/check-bundle.sh`) · `make run` · `make install` (quits a running instance, copies to `/Applications` and opens) · `make bench` (real WAVs from `BENCH_AUDIO`, default `../papo-reto-docs/bench/audio`) · `make release` (ad-hoc zips for arm64, cross-compiled, and x86_64 in `build/release`, each through `scripts/check-release.sh`; the arm64 one is untested until run on Apple Silicon) · `make win-test` · `make win-test FILTER=<Test>` · `make win-app` (self-contained win-x64 folder in `build/windows/PapoReto`).
 
 ## Conventions
 - Everything in this repo is in English: code, names, comments, UI, README, commits and PRs. `../papo-reto-docs` stays in PT-BR.

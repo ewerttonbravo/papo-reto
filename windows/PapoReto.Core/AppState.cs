@@ -10,6 +10,8 @@ public abstract record AppEvent
     public sealed record HotkeyPressed : AppEvent;
     public sealed record HotkeyReleased(TimeSpan HeldFor) : AppEvent;
     public sealed record Transcribed : AppEvent;
+    /// <summary>The microphone could not start (e.g. blocked in Windows privacy settings).</summary>
+    public sealed record RecordingFailed : AppEvent;
 }
 
 /// <summary>What the adapters must do after a transition.</summary>
@@ -38,14 +40,20 @@ public sealed record AppState
 
     public (AppState State, AppEffect[] Effects) Handling(AppEvent e) => (e, Model, Activity) switch
     {
-        (AppEvent.ModelLoaded, ModelState.Loading, _) => (this with { Model = ModelState.Ready }, []),
-        (AppEvent.ModelFailed, ModelState.Loading, _) => (this with { Model = ModelState.Unavailable }, []),
-        (AppEvent.HotkeyPressed, ModelState.Ready, ActivityState.Idle) =>
+        (AppEvent.ModelLoaded, ModelState.Loading, _) =>
+            (this with { Model = ModelState.Ready }, Activity == ActivityState.Transcribing ? [AppEffect.Transcribe] : []),
+        // Audio waiting for this model would wait forever: drop it.
+        (AppEvent.ModelFailed, ModelState.Loading, _) =>
+            (new AppState { Model = ModelState.Unavailable }, Activity == ActivityState.Idle ? [] : [AppEffect.DiscardRecording]),
+        (AppEvent.HotkeyPressed, ModelState.Loading or ModelState.Ready, ActivityState.Idle) =>
             (this with { Activity = ActivityState.Recording }, [AppEffect.StartRecording]),
+        // Without the model the audio waits; ModelLoaded transcribes it.
         (AppEvent.HotkeyReleased r, _, ActivityState.Recording) when r.HeldFor > HoldThreshold =>
-            (this with { Activity = ActivityState.Transcribing }, [AppEffect.StopRecording, AppEffect.Transcribe]),
+            (this with { Activity = ActivityState.Transcribing },
+                Model == ModelState.Ready ? [AppEffect.StopRecording, AppEffect.Transcribe] : [AppEffect.StopRecording]),
         (AppEvent.HotkeyReleased, _, ActivityState.Recording) =>
             (this with { Activity = ActivityState.Idle }, [AppEffect.DiscardRecording]),
+        (AppEvent.RecordingFailed, _, ActivityState.Recording) => (this with { Activity = ActivityState.Idle }, []),
         (AppEvent.Transcribed, _, ActivityState.Transcribing) => (this with { Activity = ActivityState.Idle }, []),
         _ => (this, []),
     };

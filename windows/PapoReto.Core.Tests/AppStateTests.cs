@@ -32,4 +32,13 @@ public class AppStateTests
         var icons = Enum.GetValues<AppState.ModelState>().Select(m => new AppState { Model = m }.Icon);
         Assert.Equal(Enum.GetValues<AppState.ModelState>().Length, icons.Distinct().Count());
     }
+
+    [Theory]
+    [InlineData(AppState.ModelState.Ready, AppEvent.ModelFailed)]
+    [InlineData(AppState.ModelState.Unavailable, AppEvent.ModelLoaded)]
+    public void ModelEventsOutsideLoadingKeepTheState(AppState.ModelState model, AppEvent e)
+    {
+        var state = new AppState { Model = model };
+        Assert.Equal(state, state.Handling(e));
+    }
 }

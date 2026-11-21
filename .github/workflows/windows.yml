@@ -1,0 +1,22 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    paths: ['windows/**', 'Makefile', 'global.json', '.github/workflows/windows.yml']
+  pull_request:
+    paths: ['windows/**', 'Makefile', 'global.json', '.github/workflows/windows.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # The C# Core has no Windows API, so Linux runs its tests.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: make win-test

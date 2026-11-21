@@ -1,6 +1,6 @@
 CLT := /Library/Developer/CommandLineTools
 # The Command Line Tools ship Swift Testing, but swift test cannot find it on its own.
-ifeq ($(shell xcode-select -p),$(CLT))
+ifeq ($(shell xcode-select -p 2>/dev/null),$(CLT))
 TESTING_FLAGS := -Xswiftc -F$(CLT)/Library/Developer/Frameworks \
 	-Xlinker -rpath -Xlinker $(CLT)/Library/Developer/Frameworks \
 	-Xlinker -rpath -Xlinker $(CLT)/Library/Developer/usr/lib
@@ -106,7 +106,7 @@ app: $(SHERPA_LIB) $(VAD_MODEL) $(ORT_NOTICES) $(ICON)
 run: app
 	open build/PapoReto.app
 
-VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist 2>/dev/null)
 OTHER_ARCH := $(if $(filter x86_64,$(NATIVE_ARCH)),arm64,x86_64)
 
 # Ad-hoc, one zip per architecture (ADR-006); this Mac's last, so vendor/ ends with its libs, even after a failure.
@@ -138,3 +138,24 @@ install: app
 	rm -rf "$(INSTALL_DIR)/PapoReto.app"
 	mv "$(INSTALL_DIR)/.PapoReto.app.tmp" "$(INSTALL_DIR)/PapoReto.app"
 	open "$(INSTALL_DIR)/PapoReto.app"
+
+# Windows (ADR-027). The SDK may live in ~/.dotnet, off the PATH: brew builds it from source on Intel.
+DOTNET ?= $(or $(shell command -v dotnet 2>/dev/null),$(HOME)/.dotnet/dotnet)
+export DOTNET_CLI_TELEMETRY_OPTOUT := 1
+export DOTNET_NOLOGO := 1
+
+.PHONY: win-test win-app
+win-test:
+ifdef FILTER
+	$(DOTNET) test windows/PapoReto.Core.Tests --filter 'FullyQualifiedName~$(FILTER)'
+else
+	$(DOTNET) test windows/PapoReto.Core.Tests -p:CollectCoverage=true -p:Include='[PapoReto.Core]*' \
+		-p:Threshold=100 -p:ThresholdType=line -p:CoverletOutput='$(CURDIR)/build/windows/'
+	@# The tray app has no tests, but it must still compile.
+	$(DOTNET) build windows/PapoReto
+endif
+
+# Self-contained folder; whether it ships as a folder or a single .exe is decided in W09.
+win-app:
+	rm -rf build/windows/PapoReto
+	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -o build/windows/PapoReto

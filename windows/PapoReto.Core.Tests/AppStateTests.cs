@@ -17,4 +17,19 @@ public class AppStateTests
         Assert.Equal(AppState.ModelState.Ready, next.Model);
         Assert.Equal(TrayIcon.Ready, next.Icon);
     }
+
+    [Fact]
+    public void ModelFailedWhileLoadingGoesModelUnavailable()
+    {
+        var next = new AppState().Handling(AppEvent.ModelFailed);
+        Assert.Equal(AppState.ModelState.Unavailable, next.Model);
+        Assert.Equal(TrayIcon.Unavailable, next.Icon);
+    }
+
+    [Fact]
+    public void EveryStateHasADistinctIcon()
+    {
+        var icons = Enum.GetValues<AppState.ModelState>().Select(m => new AppState { Model = m }.Icon);
+        Assert.Equal(Enum.GetValues<AppState.ModelState>().Length, icons.Distinct().Count());
+    }
 }

@@ -19,8 +19,10 @@ public sealed record AppState
         _ => TrayIcon.Unavailable,
     };
 
-    public AppState Handling(AppEvent e) => Model != ModelState.Loading ? this : this with
+    public AppState Handling(AppEvent e) => (e, Model) switch
     {
-        Model = e == AppEvent.ModelLoaded ? ModelState.Ready : ModelState.Unavailable,
+        (AppEvent.ModelLoaded, ModelState.Loading) => this with { Model = ModelState.Ready },
+        (AppEvent.ModelFailed, ModelState.Loading) => this with { Model = ModelState.Unavailable },
+        _ => this,
     };
 }

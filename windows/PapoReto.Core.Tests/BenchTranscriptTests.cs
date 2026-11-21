@@ -23,4 +23,26 @@ public class BenchTranscriptTests
             ["real-01.wav"] = "Custa R$ 99,99.",
         }, texts);
     }
+
+    static readonly IReadOnlyDictionary<string, string> Mac = BenchTranscript.Parse(MacOutput);
+
+    [Fact]
+    public void MatchingTextHasNoDivergence()
+    {
+        Assert.Empty(BenchTranscript.Divergences(Mac, [("luciana.wav", "Bom dia, pessoal."), ("real-01.wav", "Custa R$ 99,99.")]));
+    }
+
+    [Fact]
+    public void ADifferentWordIsADivergenceNamingTheFile()
+    {
+        var found = BenchTranscript.Divergences(Mac, [("luciana.wav", "Bom dia, pessoal."), ("real-01.wav", "Custa R$ 9,99.")]);
+        Assert.Equal(["real-01.wav: Mac \"Custa R$ 99,99.\" · Windows \"Custa R$ 9,99.\""], found);
+    }
+
+    [Fact]
+    public void AFileMissingFromTheMacOutputIsADivergence()
+    {
+        var found = BenchTranscript.Divergences(Mac, [("real-02.wav", "Oi.")]);
+        Assert.Equal(["real-02.wav: not in the Mac output · Windows \"Oi.\""], found);
+    }
 }

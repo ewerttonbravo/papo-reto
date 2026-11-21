@@ -151,6 +151,8 @@ ifdef FILTER
 else
 	$(DOTNET) test windows/PapoReto.Core.Tests -p:CollectCoverage=true -p:Include='[PapoReto.Core]*' \
 		-p:Threshold=100 -p:ThresholdType=line -p:CoverletOutput='$(CURDIR)/build/windows/'
+	@# The tray app has no tests, but it must still compile.
+	$(DOTNET) build windows/PapoReto
 endif
 
 # Self-contained folder; whether it ships as a folder or a single .exe is decided in W09.

@@ -16,12 +16,14 @@ static class Program
 sealed class TrayContext : ApplicationContext
 {
     readonly NotifyIcon tray = new() { Text = "Papo Reto", Visible = true };
+    // NotifyIcon.Dispose leaves its menu alive.
+    readonly ContextMenuStrip menu = new();
 
     public TrayContext()
     {
         tray.Icon = IconFor(new AppState().Icon);
-        tray.ContextMenuStrip = new ContextMenuStrip();
-        tray.ContextMenuStrip.Items.Add("Quit", null, (_, _) => ExitThread());
+        menu.Items.Add("Quit", null, (_, _) => ExitThread());
+        tray.ContextMenuStrip = menu;
     }
 
     // Provisional until W12 draws the profile.
@@ -36,6 +38,7 @@ sealed class TrayContext : ApplicationContext
         // Hidden first, or the icon lingers in the tray until the mouse passes over it.
         tray.Visible = false;
         tray.Dispose();
+        menu.Dispose();
         base.ExitThreadCore();
     }
 }

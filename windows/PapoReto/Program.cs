@@ -40,18 +40,21 @@ sealed class TrayContext : ApplicationContext
 
     async Task LoadModel()
     {
+        // A corrupt file can abort in native code: this line without a "Loaded" one says so (W07 hashes before loading).
+        Log.Write("model", "Loading");
         var clock = Stopwatch.StartNew();
         try
         {
             transcriber = await Task.Run(() => new Transcriber());
-            Log.Write("model", $"Loaded in {clock.Elapsed.TotalSeconds:F2} s, {transcriber.Threads} threads");
-            Apply(AppEvent.ModelLoaded);
         }
         catch (Exception e)
         {
             Log.Write("model", $"Load failed after {clock.Elapsed.TotalSeconds:F2} s: {e.Message}");
             Apply(AppEvent.ModelFailed);
+            return;
         }
+        Log.Write("model", $"Loaded in {clock.Elapsed.TotalSeconds:F2} s, {transcriber.Threads} threads");
+        Apply(AppEvent.ModelLoaded);
     }
 
     void Apply(AppEvent e)

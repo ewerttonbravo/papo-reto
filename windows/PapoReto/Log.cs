@@ -8,8 +8,11 @@ static class Log
 
     public static void Start()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        Write(() => File.WriteAllText(FilePath, ""));
+        Write(() =>
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+            File.WriteAllText(FilePath, "");
+        });
     }
 
     public static void Write(string category, string message) =>

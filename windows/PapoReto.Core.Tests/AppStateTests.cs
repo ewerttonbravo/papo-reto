@@ -94,4 +94,71 @@ public class AppStateTests
         Assert.Equal(Ready, next);
         Assert.Empty(effects);
     }
+
+    static readonly AppState Loading = new();
+    static readonly AppState RecordingWhileLoading = Loading with { Activity = AppState.ActivityState.Recording };
+    static readonly AppState PendingWhileLoading = Loading with { Activity = AppState.ActivityState.Transcribing };
+
+    [Fact]
+    public void HotkeyPressedWhileLoadingStartsRecording()
+    {
+        var (next, effects) = Loading.Handling(new AppEvent.HotkeyPressed());
+        Assert.Equal(RecordingWhileLoading, next);
+        Assert.Equal(new[] { AppEffect.StartRecording }, effects);
+    }
+
+    [Fact]
+    public void HotkeyReleasedWhileLoadingWaitsForTheModel()
+    {
+        var (next, effects) = RecordingWhileLoading.Handling(new AppEvent.HotkeyReleased(Ms(301)));
+        Assert.Equal(PendingWhileLoading, next);
+        Assert.Equal(new[] { AppEffect.StopRecording }, effects);
+    }
+
+    [Fact]
+    public void ModelLoadedWithPendingAudioTranscribes()
+    {
+        var (next, effects) = PendingWhileLoading.Handling(new AppEvent.ModelLoaded());
+        Assert.Equal(Transcribing, next);
+        Assert.Equal(new[] { AppEffect.Transcribe }, effects);
+    }
+
+    [Theory]
+    [InlineData(AppState.ActivityState.Recording)]
+    [InlineData(AppState.ActivityState.Transcribing)]
+    public void ModelFailedWithPendingAudioDiscardsIt(AppState.ActivityState activity)
+    {
+        var (next, effects) = (Loading with { Activity = activity }).Handling(new AppEvent.ModelFailed());
+        Assert.Equal(new AppState { Model = AppState.ModelState.Unavailable }, next);
+        Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    public static TheoryData<AppState> HotkeyIgnoredStates => new()
+    {
+        new AppState { Model = AppState.ModelState.Unavailable },
+        Transcribing,
+        PendingWhileLoading,
+        // The keyboard's auto-repeat sends the key down again while it is held.
+        Recording,
+    };
+
+    [Theory]
+    [MemberData(nameof(HotkeyIgnoredStates))]
+    public void HotkeyIgnoredWhenModelUnavailableTranscribingOrRecording(AppState state)
+    {
+        var (next, effects) = state.Handling(new AppEvent.HotkeyPressed());
+        Assert.Equal(state, next);
+        Assert.Empty(effects);
+    }
+
+    [Theory]
+    [InlineData(AppState.ModelState.Ready)]
+    [InlineData(AppState.ModelState.Loading)]
+    public void RecordingFailedGoesBackToIdle(AppState.ModelState model)
+    {
+        var state = new AppState { Model = model };
+        var (next, effects) = (state with { Activity = AppState.ActivityState.Recording }).Handling(new AppEvent.RecordingFailed());
+        Assert.Equal(state, next);
+        Assert.Empty(effects);
+    }
 }

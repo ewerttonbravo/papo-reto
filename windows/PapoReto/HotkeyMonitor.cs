@@ -3,12 +3,13 @@ using System.Runtime.InteropServices;
 
 namespace PapoReto;
 
-/// <summary>Right Ctrl through a low-level keyboard hook that only observes: the key still reaches the focused app.</summary>
+/// <summary>AltGr (Right Alt) through a low-level keyboard hook that only observes: the key still reaches the focused app.
+/// ABNT2 notebooks have no Right Ctrl; AltGr is on every layout (Right Alt on US).</summary>
 sealed class HotkeyMonitor : IDisposable
 {
     const int WH_KEYBOARD_LL = 13;
     const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105, WM_QUIT = 0x0012;
-    const uint VK_RCONTROL = 0xA3;
+    const uint VK_RMENU = 0xA5;
 
     readonly SynchronizationContext ui = SynchronizationContext.Current!;
     readonly Action pressed;
@@ -47,12 +48,12 @@ sealed class HotkeyMonitor : IDisposable
         {
             var key = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(data);
             var msg = (int)message;
-            if (key.vkCode == VK_RCONTROL && (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) && downAt is null)
+            if (key.vkCode == VK_RMENU && (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) && downAt is null)
             {
                 downAt = key.time;
                 ui.Post(_ => pressed(), null);
             }
-            else if (key.vkCode == VK_RCONTROL && (msg == WM_KEYUP || msg == WM_SYSKEYUP) && downAt is uint at)
+            else if (key.vkCode == VK_RMENU && (msg == WM_KEYUP || msg == WM_SYSKEYUP) && downAt is uint at)
             {
                 downAt = null;
                 // Event times in ms, as GetTickCount: unsigned subtraction survives the 49-day wrap.

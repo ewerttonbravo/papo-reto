@@ -10,5 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PapoReto.Core/PapoReto.Core.csproj" />
+    <ProjectReference Include="../PapoReto.Sherpa/PapoReto.Sherpa.csproj" />
   </ItemGroup>
 </Project>

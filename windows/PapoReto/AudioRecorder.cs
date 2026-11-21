@@ -14,6 +14,18 @@ sealed class AudioRecorder
     /// <summary>The device failed after Start returned (capture thread errors, a device lost at once); on the UI thread.</summary>
     public event Action? Failed;
 
+    /// <summary>Loads NAudio and the Windows audio stack before the model load fills the disk:
+    /// on the notebook's failing HD, the first start during the load began ~2 s late or failed (REGDB_E_CLASSNOTREG).</summary>
+    public static void WarmUp()
+    {
+        try
+        {
+            using var devices = new MMDeviceEnumerator();
+            devices.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console).Dispose();
+        }
+        catch (Exception e) { Log.Write("audio", $"No default microphone at launch: {e.Message}"); }
+    }
+
     /// <summary>Throws when there is no microphone or Windows privacy settings block it.</summary>
     public void Start()
     {

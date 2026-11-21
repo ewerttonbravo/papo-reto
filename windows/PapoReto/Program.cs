@@ -51,6 +51,7 @@ sealed class TrayContext : ApplicationContext
         {
             Log.Write("hotkey", $"Keyboard hook failed: {e.Message}");
         }
+        AudioRecorder.WarmUp();
         _ = LoadModel();
     }
 
@@ -85,7 +86,12 @@ sealed class TrayContext : ApplicationContext
         switch (effect)
         {
             case AppEffect.StartRecording:
-                try { recorder.Start(); }
+                try
+                {
+                    var clock = Stopwatch.StartNew();
+                    recorder.Start();
+                    Log.Write("audio", $"Recording started in {clock.ElapsedMilliseconds} ms");
+                }
                 catch (Exception e)
                 {
                     Log.Write("audio", $"Recording failed to start: {e.Message}");

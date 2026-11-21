@@ -8,6 +8,7 @@ public interface IClipboard<TSnapshot>
     TSnapshot Snapshot();
     /// <summary>Writes text marked so that the history, the cloud clipboard and clipboard managers skip it.</summary>
     void WriteExcluded(string text);
+    void Restore(TSnapshot snapshot);
 }
 
 public interface IKeyboard
@@ -18,8 +19,12 @@ public interface IKeyboard
 /// <summary>The clipboard the user had before a paste, to put back once the target app has read the text.</summary>
 public sealed class PendingRestore<TSnapshot>(TSnapshot snapshot, uint sequence)
 {
-    public TSnapshot Snapshot { get; } = snapshot;
-    public uint Sequence { get; } = sequence;
+    /// <summary>Skipped when someone wrote to the clipboard after our text: their copy wins.</summary>
+    public void RestoreOn(IClipboard<TSnapshot> clipboard)
+    {
+        if (clipboard.Sequence != sequence) return;
+        clipboard.Restore(snapshot);
+    }
 }
 
 public static class Paster

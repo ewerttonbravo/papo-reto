@@ -15,4 +15,13 @@ public static class BenchTranscript
         }
         return texts;
     }
+
+    /// <summary>One line per file whose text is not the Mac's; empty means the text matches.</summary>
+    public static IReadOnlyList<string> Divergences(IReadOnlyDictionary<string, string> mac, IEnumerable<(string File, string Text)> windows) =>
+        windows
+            .Where(w => !mac.TryGetValue(w.File, out var text) || text != w.Text)
+            .Select(w => mac.TryGetValue(w.File, out var text)
+                ? $"{w.File}: Mac \"{text}\" · Windows \"{w.Text}\""
+                : $"{w.File}: not in the Mac output · Windows \"{w.Text}\"")
+            .ToList();
 }

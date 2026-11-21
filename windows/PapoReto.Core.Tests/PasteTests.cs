@@ -10,6 +10,7 @@ sealed class FakeClipboard(params string[] items) : IClipboard<string[]>, IKeybo
     public string[] Snapshot() { Calls.Add("snapshot"); return Items; }
     public void WriteExcluded(string text) { Calls.Add($"write {text}"); Items = [text]; Sequence++; }
     public void Restore(string[] snapshot) { Calls.Add("restore"); Items = snapshot; Sequence++; }
+    public bool IsConcealed(string[] snapshot) => snapshot.Contains("password");
     public void PressCtrlV() => Calls.Add("ctrl+v");
 }
 
@@ -41,5 +42,14 @@ public class PasteTests
         clipboard.Sequence++;
         pending.RestoreOn(clipboard);
         Assert.Equal(["copied by the user"], clipboard.Items);
+    }
+
+    [Fact]
+    public void RestoreSkipsAConcealedClipboard()
+    {
+        var clipboard = new FakeClipboard("password");
+        var pending = Paster.Paste("Bom dia.", clipboard, clipboard);
+        pending.RestoreOn(clipboard);
+        Assert.Equal(["Bom dia."], clipboard.Items);
     }
 }

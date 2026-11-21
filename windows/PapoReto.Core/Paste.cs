@@ -9,6 +9,8 @@ public interface IClipboard<TSnapshot>
     /// <summary>Writes text marked so that the history, the cloud clipboard and clipboard managers skip it.</summary>
     void WriteExcluded(string text);
     void Restore(TSnapshot snapshot);
+    /// <summary>True for a password manager's copy (ExcludeClipboardContentFromMonitorProcessing).</summary>
+    bool IsConcealed(TSnapshot snapshot);
 }
 
 public interface IKeyboard
@@ -19,10 +21,11 @@ public interface IKeyboard
 /// <summary>The clipboard the user had before a paste, to put back once the target app has read the text.</summary>
 public sealed class PendingRestore<TSnapshot>(TSnapshot snapshot, uint sequence)
 {
-    /// <summary>Skipped when someone wrote to the clipboard after our text: their copy wins.</summary>
+    /// <summary>Skipped when someone wrote to the clipboard after our text: their copy wins. Skipped for a
+    /// password too: writing it back as a new copy stops its manager from clearing it later.</summary>
     public void RestoreOn(IClipboard<TSnapshot> clipboard)
     {
-        if (clipboard.Sequence != sequence) return;
+        if (clipboard.Sequence != sequence || clipboard.IsConcealed(snapshot)) return;
         clipboard.Restore(snapshot);
     }
 }

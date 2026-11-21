@@ -9,4 +9,12 @@ public class AppStateTests
         Assert.Equal(AppState.ModelState.Loading, state.Model);
         Assert.Equal(TrayIcon.Loading, state.Icon);
     }
+
+    [Fact]
+    public void ModelLoadedWhileLoadingGoesReady()
+    {
+        var next = new AppState().Handling(AppEvent.ModelLoaded);
+        Assert.Equal(AppState.ModelState.Ready, next.Model);
+        Assert.Equal(TrayIcon.Ready, next.Icon);
+    }
 }

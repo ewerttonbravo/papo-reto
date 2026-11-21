@@ -29,6 +29,8 @@ sealed class TrayContext : ApplicationContext
     // Until W07 downloads it, the model comes from the Mac's make win-bench.
     readonly ToolStripMenuItem modelMissing = new("Model not found. Run make win-bench on the Mac") { Enabled = false };
     readonly AudioRecorder recorder = new();
+    readonly WindowsClipboard clipboard = new();
+    readonly WindowsKeyboard keyboard = new();
     readonly HotkeyMonitor? hotkey;
     AppState state = new();
     // Resident (ADR-003).
@@ -121,16 +123,30 @@ sealed class TrayContext : ApplicationContext
             var samples = await audio;
             var text = await Task.Run(() => transcriber!.Transcribe(samples, AudioRecorder.SampleRate));
             Log.Write("dictation", $"{(double)samples.Length / AudioRecorder.SampleRate:F2} s of audio transcribed in {clock.Elapsed.TotalSeconds:F2} s");
-            // Back on the UI thread, which is STA as the clipboard requires.
-            if (FinalText.Of(text) is { } final) Clipboard.SetText(final);
+            // Back on the UI thread, which owns the clipboard's window.
+            if (FinalText.Of(text) is { } final) _ = RestoreLater(Paster.Paste(final, clipboard, keyboard), clipboard);
         }
         catch (Exception e)
         {
-            // The message of a sherpa or clipboard error, never the text.
+            // The message of a sherpa, clipboard or SendInput error, never the text.
             Log.Write("dictation", $"Failed: {e.Message}");
         }
         pendingAudio = null;
         Apply(new AppEvent.Transcribed());
+    }
+
+    static async Task RestoreLater<T>(PendingRestore<T> pending, IClipboard<T> clipboard)
+    {
+        // Time for the focused app to read the text before the user's clipboard comes back.
+        await Task.Delay(250);
+        try
+        {
+            pending.RestoreOn(clipboard);
+        }
+        catch (Exception e)
+        {
+            Log.Write("paste", $"Restore failed: {e.Message}");
+        }
     }
 
     void Render()
@@ -154,6 +170,7 @@ sealed class TrayContext : ApplicationContext
     {
         // Hidden first, or the icon lingers in the tray until the mouse passes over it.
         hotkey?.Dispose();
+        clipboard.Dispose();
         tray.Visible = false;
         tray.Dispose();
         menu.Dispose();

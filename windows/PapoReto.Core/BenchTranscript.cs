@@ -11,7 +11,7 @@ public static class BenchTranscript
         for (int i = 0; i + 1 < lines.Length; i++)
         {
             var file = lines[i].Split(" · audio ");
-            if (file.Length > 1) texts[file[0]] = lines[i + 1].TrimEnd('\r')[2..];
+            if (file.Length > 1) texts[file[0]] = lines[i + 1][2..];
         }
         return texts;
     }

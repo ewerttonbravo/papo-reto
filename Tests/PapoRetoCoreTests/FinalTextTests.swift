@@ -17,3 +17,8 @@ func blankTranscriptionHasNoFinalText(transcription: String) {
 @Test func dictationAfterACharacterStartsWithASpace() {
     #expect(textToPaste("Texto", after: .character(".")) == " Texto")
 }
+
+@Test(arguments: [TextBeforeCursor.character(" "), .character("\n"), .character("\t"), .nothing])
+func dictationAfterWhitespaceOrAtTheStartHasNoSpace(before: TextBeforeCursor) {
+    #expect(textToPaste("Texto", after: before) == "Texto")
+}

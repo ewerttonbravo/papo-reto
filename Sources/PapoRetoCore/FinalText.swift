@@ -6,11 +6,6 @@ public func finalText(_ transcription: String) -> String? {
     return text.isEmpty ? nil : text
 }
 
-/// What goes to the cursor: one trailing space keeps the next dictation from sticking to this one.
-public func textToPaste(_ text: String) -> String {
-    text + " "
-}
-
 /// What precedes the cursor in the focused field; unknown when the field does not answer.
 public enum TextBeforeCursor: Sendable {
     case unknown
@@ -18,8 +13,11 @@ public enum TextBeforeCursor: Sendable {
     case character(Character)
 }
 
+/// What goes to the cursor: a space before when the text would stick to a word. A field that
+/// cannot be read gets one at the end instead, so the next dictation does not stick to this one.
 public func textToPaste(_ text: String, after before: TextBeforeCursor) -> String {
     switch before {
+    case .unknown: text + " "
     case .character(let character) where !character.isWhitespace: " " + text
     default: text
     }

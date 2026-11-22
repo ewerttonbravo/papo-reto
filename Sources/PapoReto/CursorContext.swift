@@ -37,6 +37,9 @@ enum CursorContext {
         // The paste replaces the selection, so what follows it is what the text will touch. Past the
         // end of the field the read fails, which is the same as nothing after.
         let after = string(in: CFRange(location: range.location + range.length, length: 1), of: field)?.first
+        // Electron with Accessibility off answers {0, 0} over an empty stand-in for the real text,
+        // which looks like an empty field: both get the trailing space of T19.
+        if before == nil && after == nil { return nil }
         return TextAroundCursor(before: before, after: after)
     }
 

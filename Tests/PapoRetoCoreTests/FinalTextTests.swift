@@ -32,3 +32,7 @@ func dictationBeforeALetterOrNumberEndsWithASpace(after: Character) {
 func dictationBeforeWhitespacePunctuationOrTheEndHasNoTrailingSpace(after: Character?) {
     #expect(textToPaste("Texto", around: TextAroundCursor(before: nil, after: after)) == "Texto")
 }
+
+@Test func dictationBetweenTwoWordsHasASpaceOnEachSide() {
+    #expect(textToPaste("Texto", around: TextAroundCursor(before: "a", after: "m")) == " Texto ")
+}

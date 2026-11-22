@@ -5,3 +5,8 @@ public func finalText(_ transcription: String) -> String? {
     let text = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
     return text.isEmpty ? nil : text
 }
+
+/// What goes to the cursor: one trailing space keeps the next dictation from sticking to this one.
+public func textToPaste(_ text: String) -> String {
+    text + " "
+}

@@ -29,3 +29,8 @@ import PapoRetoCore
     let text = String(repeating: "a", count: 50) + "b"
     #expect(historyTitle(text) == String(repeating: "a", count: 50) + "…")
 }
+
+@Test func cutTitleDropsTheSpaceBeforeTheEllipsis() {
+    let text = String(repeating: "a", count: 49) + " de vendas"
+    #expect(historyTitle(text) == String(repeating: "a", count: 49) + "…")
+}

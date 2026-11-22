@@ -9,12 +9,7 @@
   <img src="https://img.shields.io/badge/macOS-13%2B-lightgrey" alt="macOS 13+">
 </p>
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/menu-bar-dark.png">
-    <img src="assets/menu-bar-light.png" width="360" alt="The menu bar icon when ready, listening and thinking">
-  </picture>
-</p>
+<p align="center"><img src="assets/demo.gif" width="720" alt="Holding Fn in TextEdit, speaking in Portuguese and the text appearing at the cursor"></p>
 
 ## Why Papo Reto
 - **Free:** MIT licensed, no account, no subscription, no word limit.
@@ -27,6 +22,13 @@
 2. **Speak.** A sound confirms that recording started.
 3. **Release.** The speech is transcribed on your Mac, about 1 s for 10 s of speech on a 2020 Intel MacBook Pro.
 4. **Done.** The text is pasted at the cursor.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/menu-bar-dark.png">
+    <img src="assets/menu-bar-light.png" width="360" alt="The menu bar icon when ready, listening and thinking">
+  </picture>
+</p>
 
 For longer dictation, double-tap `Fn` to record hands-free and press `Fn` again to stop. `Esc` cancels.
 

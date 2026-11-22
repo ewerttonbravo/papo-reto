@@ -19,3 +19,8 @@ import PapoRetoCore
     for n in 1...10 { history.add("Ditado \(n)") }
     #expect(history.entries == (1...10).reversed().map { "Ditado \($0)" })
 }
+
+@Test func dictationUpTo50CharactersIsTheWholeTitle() {
+    let text = String(repeating: "a", count: 50)
+    #expect(historyTitle(text) == text)
+}

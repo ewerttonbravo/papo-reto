@@ -10,3 +10,8 @@ public struct DictationHistory {
         if entries.count > Self.limit { entries.removeLast() }
     }
 }
+
+/// The dictation's title in the Recent menu.
+public func historyTitle(_ text: String) -> String {
+    text
+}

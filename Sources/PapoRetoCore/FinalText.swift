@@ -10,3 +10,14 @@ public func finalText(_ transcription: String) -> String? {
 public func textToPaste(_ text: String) -> String {
     text + " "
 }
+
+/// What precedes the cursor in the focused field; unknown when the field does not answer.
+public enum TextBeforeCursor: Sendable {
+    case unknown
+    case nothing
+    case character(Character)
+}
+
+public func textToPaste(_ text: String, after before: TextBeforeCursor) -> String {
+    " " + text
+}

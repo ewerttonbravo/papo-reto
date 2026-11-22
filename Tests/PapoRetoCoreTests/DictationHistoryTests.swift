@@ -20,17 +20,17 @@ import PapoRetoCore
     #expect(history.entries == (1...10).reversed().map { "Ditado \($0)" })
 }
 
-@Test func dictationUpTo50CharactersIsTheWholeTitle() {
-    let text = String(repeating: "a", count: 50)
+@Test func dictationUpTo35CharactersIsTheWholeTitle() {
+    let text = String(repeating: "a", count: 35)
     #expect(historyTitle(text) == text)
 }
 
-@Test func longerDictationIsCutAt50WithAnEllipsis() {
-    let text = String(repeating: "a", count: 50) + "b"
-    #expect(historyTitle(text) == String(repeating: "a", count: 50) + "…")
+@Test func longerDictationIsCutAt35WithAnEllipsis() {
+    let text = String(repeating: "a", count: 35) + "b"
+    #expect(historyTitle(text) == String(repeating: "a", count: 35) + "…")
 }
 
 @Test func cutTitleDropsTheSpaceBeforeTheEllipsis() {
-    let text = String(repeating: "a", count: 49) + " de vendas"
-    #expect(historyTitle(text) == String(repeating: "a", count: 49) + "…")
+    let text = String(repeating: "a", count: 34) + " de vendas"
+    #expect(historyTitle(text) == String(repeating: "a", count: 34) + "…")
 }

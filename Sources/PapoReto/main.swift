@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Download progress, or Retry after a failure.
     private let modelItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let microphoneMenu = NSMenu()
+    private var history = DictationHistory()
+    private let historyMenu = NSMenu()
+    /// Without a submenu (and no action) the menu greys it out: nothing dictated yet.
+    private let historyItem = NSMenuItem(title: "Recent", action: nil, keyEquivalent: "")
     private let accessibilityItem = NSMenuItem(
         title: "Allow Accessibility…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private var accessibilityObserver: NSObjectProtocol?
@@ -32,6 +36,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         menu.addItem(modelItem)
         menu.addItem(accessibilityItem)
+        historyMenu.delegate = self
+        menu.addItem(historyItem)
         let microphoneItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
         microphoneMenu.delegate = self
         microphoneItem.submenu = microphoneMenu
@@ -254,6 +260,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func didTranscribe(_ transcription: String, footprintMB: Double) {
         if let text = finalText(transcription) {
+            history.add(text)
+            historyItem.submenu = historyMenu
             let pasteboard = SystemPasteboard()
             let pending = paste(text, pasteboard: pasteboard, keyboard: SystemKeyboard())
             // Time for the focused app to read the text before the user's clipboard comes back.
@@ -275,11 +283,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// The main menu: a fallback should the Accessibility notification not arrive.
     func menuWillOpen(_ menu: NSMenu) {
-        if menu !== microphoneMenu { startFnMonitor() }
+        if menu === statusItem?.menu { startFnMonitor() }
     }
 
     /// Rebuilt on each opening, so a device plugged in meanwhile shows up without polling.
     func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === historyMenu { return showHistory() }
         guard menu === microphoneMenu else { return }
         let devices = AudioDevices.inputs()
         let inUse = currentMicrophone(among: devices)?.uid
@@ -292,6 +301,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.state = entry.uid == inUse ? .on : .off
             menu.addItem(item)
         }
+    }
+
+    private func showHistory() {
+        historyMenu.removeAllItems()
+        for text in history.entries {
+            let item = NSMenuItem(title: historyTitle(text), action: #selector(copyDictation(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = text
+            historyMenu.addItem(item)
+        }
+    }
+
+    /// A plain copy, unlike the paste: the user asked for it, so clipboard managers may keep it.
+    @objc private func copyDictation(_ sender: NSMenuItem) {
+        guard let text = sender.representedObject as? String else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     @objc private func chooseMicrophone(_ sender: NSMenuItem) {

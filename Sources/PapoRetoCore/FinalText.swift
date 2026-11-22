@@ -19,5 +19,8 @@ public enum TextBeforeCursor: Sendable {
 }
 
 public func textToPaste(_ text: String, after before: TextBeforeCursor) -> String {
-    " " + text
+    switch before {
+    case .character(let character) where !character.isWhitespace: " " + text
+    default: text
+    }
 }

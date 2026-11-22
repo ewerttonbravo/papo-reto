@@ -11,7 +11,7 @@ public struct DictationHistory {
     }
 }
 
-/// The dictation's title in the Recent menu.
+/// The dictation's title in the Recent menu, short enough to keep the menu narrow.
 public func historyTitle(_ text: String) -> String {
-    text
+    text.count > 50 ? text.prefix(50) + "…" : text
 }

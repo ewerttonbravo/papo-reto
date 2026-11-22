@@ -22,7 +22,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let microphoneMenu = NSMenu()
     private var history = DictationHistory()
     private let historyMenu = NSMenu()
-    /// Without a submenu (and no action) the menu greys it out: nothing dictated yet.
     private let historyItem = NSMenuItem(title: "Recent", action: nil, keyEquivalent: "")
     private let accessibilityItem = NSMenuItem(
         title: "Allow Accessibility…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
@@ -37,6 +36,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(modelItem)
         menu.addItem(accessibilityItem)
         historyMenu.delegate = self
+        historyItem.submenu = historyMenu
+        // Auto-enabling leaves an item with a submenu as it is set. Adding the submenu later
+        // does not re-enable an item it already disabled.
+        historyItem.isEnabled = false
         menu.addItem(historyItem)
         let microphoneItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
         microphoneMenu.delegate = self
@@ -261,7 +264,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func didTranscribe(_ transcription: String, footprintMB: Double) {
         if let text = finalText(transcription) {
             history.add(text)
-            historyItem.submenu = historyMenu
+            historyItem.isEnabled = true
             let pasteboard = SystemPasteboard()
             let pending = paste(text, pasteboard: pasteboard, keyboard: SystemKeyboard())
             // Time for the focused app to read the text before the user's clipboard comes back.

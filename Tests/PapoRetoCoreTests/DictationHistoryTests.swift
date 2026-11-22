@@ -1,0 +1,36 @@
+import Testing
+import PapoRetoCore
+
+@Test func historyListsTheNewestDictationFirst() {
+    var history = DictationHistory()
+    history.add("Bom dia.")
+    history.add("Boa tarde.")
+    #expect(history.entries == ["Boa tarde.", "Bom dia."])
+}
+
+@Test func eleventhDictationDropsTheOldest() {
+    var history = DictationHistory()
+    for n in 1...11 { history.add("Ditado \(n)") }
+    #expect(history.entries == (2...11).reversed().map { "Ditado \($0)" })
+}
+
+@Test func tenDictationsAreAllKept() {
+    var history = DictationHistory()
+    for n in 1...10 { history.add("Ditado \(n)") }
+    #expect(history.entries == (1...10).reversed().map { "Ditado \($0)" })
+}
+
+@Test func dictationUpTo35CharactersIsTheWholeTitle() {
+    let text = String(repeating: "a", count: 35)
+    #expect(historyTitle(text) == text)
+}
+
+@Test func longerDictationIsCutAt35WithAnEllipsis() {
+    let text = String(repeating: "a", count: 35) + "b"
+    #expect(historyTitle(text) == String(repeating: "a", count: 35) + "…")
+}
+
+@Test func cutTitleDropsTheSpaceBeforeTheEllipsis() {
+    let text = String(repeating: "a", count: 34) + " de vendas"
+    #expect(historyTitle(text) == String(repeating: "a", count: 34) + "…")
+}

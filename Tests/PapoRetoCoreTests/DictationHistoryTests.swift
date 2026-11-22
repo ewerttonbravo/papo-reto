@@ -7,3 +7,9 @@ import PapoRetoCore
     history.add("Boa tarde.")
     #expect(history.entries == ["Boa tarde.", "Bom dia."])
 }
+
+@Test func eleventhDictationDropsTheOldest() {
+    var history = DictationHistory()
+    for n in 1...11 { history.add("Ditado \(n)") }
+    #expect(history.entries == (2...11).reversed().map { "Ditado \($0)" })
+}

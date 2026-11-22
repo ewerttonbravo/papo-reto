@@ -9,3 +9,7 @@ import PapoRetoCore
 func blankTranscriptionHasNoFinalText(transcription: String) {
     #expect(finalText(transcription) == nil)
 }
+
+@Test func pastedDictationEndsWithOneSpace() {
+    #expect(textToPaste("Bom dia, pessoal.") == "Bom dia, pessoal. ")
+}

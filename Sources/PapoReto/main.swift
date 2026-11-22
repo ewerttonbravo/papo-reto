@@ -266,7 +266,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             history.add(text)
             historyItem.isEnabled = true
             let pasteboard = SystemPasteboard()
-            let pasted = textToPaste(text, after: CursorContext.textBeforeCursor())
+            let pasted = textToPaste(text, around: CursorContext.textAroundCursor())
             let pending = paste(pasted, pasteboard: pasteboard, keyboard: SystemKeyboard())
             // Time for the focused app to read the text before the user's clipboard comes back.
             Task {
@@ -322,7 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// the dictation's: the user asked for it, so clipboard managers may keep it.
     @objc private func pasteDictation(_ sender: NSMenuItem) {
         guard let text = sender.representedObject as? String else { return }
-        let pasted = textToPaste(text, after: CursorContext.textBeforeCursor())
+        let pasted = textToPaste(text, around: CursorContext.textAroundCursor())
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(pasted, forType: .string)
         SystemKeyboard().pressCmdV()

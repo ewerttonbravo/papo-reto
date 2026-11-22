@@ -11,14 +11,14 @@ func blankTranscriptionHasNoFinalText(transcription: String) {
 }
 
 @Test func pastedDictationEndsWithOneSpace() {
-    #expect(textToPaste("Bom dia, pessoal.", after: .unknown) == "Bom dia, pessoal. ")
+    #expect(textToPaste("Bom dia, pessoal.", around: nil) == "Bom dia, pessoal. ")
 }
 
 @Test func dictationAfterACharacterStartsWithASpace() {
-    #expect(textToPaste("Texto", after: .character(".")) == " Texto")
+    #expect(textToPaste("Texto", around: TextAroundCursor(before: ".", after: nil)) == " Texto")
 }
 
-@Test(arguments: [TextBeforeCursor.character(" "), .character("\n"), .character("\t"), .nothing])
-func dictationAfterWhitespaceOrAtTheStartHasNoSpace(before: TextBeforeCursor) {
-    #expect(textToPaste("Texto", after: before) == "Texto")
+@Test(arguments: [Character(" "), "\n", "\t", nil])
+func dictationAfterWhitespaceOrAtTheStartHasNoSpace(before: Character?) {
+    #expect(textToPaste("Texto", around: TextAroundCursor(before: before, after: nil)) == "Texto")
 }

@@ -6,19 +6,22 @@ public func finalText(_ transcription: String) -> String? {
     return text.isEmpty ? nil : text
 }
 
-/// What precedes the cursor in the focused field; unknown when the field does not answer.
-public enum TextBeforeCursor: Sendable {
-    case unknown
-    case nothing
-    case character(Character)
+/// The characters next to the cursor in the focused field: nil before at its start, nil after at
+/// its end or when that side does not answer.
+public struct TextAroundCursor: Sendable {
+    public let before: Character?
+    public let after: Character?
+
+    public init(before: Character?, after: Character?) {
+        self.before = before
+        self.after = after
+    }
 }
 
 /// What goes to the cursor: a space before when the text would stick to a word. A field that
-/// cannot be read gets one at the end instead, so the next dictation does not stick to this one.
-public func textToPaste(_ text: String, after before: TextBeforeCursor) -> String {
-    switch before {
-    case .unknown: text + " "
-    case .character(let character) where !character.isWhitespace: " " + text
-    default: text
-    }
+/// cannot be read (nil) gets one at the end instead, so the next dictation does not stick to this one.
+public func textToPaste(_ text: String, around: TextAroundCursor?) -> String {
+    guard let around else { return text + " " }
+    guard let before = around.before, !before.isWhitespace else { return text }
+    return " " + text
 }

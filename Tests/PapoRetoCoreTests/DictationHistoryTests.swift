@@ -24,3 +24,8 @@ import PapoRetoCore
     let text = String(repeating: "a", count: 50)
     #expect(historyTitle(text) == text)
 }
+
+@Test func longerDictationIsCutAt50WithAnEllipsis() {
+    let text = String(repeating: "a", count: 50) + "b"
+    #expect(historyTitle(text) == String(repeating: "a", count: 50) + "…")
+}

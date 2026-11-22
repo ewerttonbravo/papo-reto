@@ -13,3 +13,7 @@ func blankTranscriptionHasNoFinalText(transcription: String) {
 @Test func pastedDictationEndsWithOneSpace() {
     #expect(textToPaste("Bom dia, pessoal.") == "Bom dia, pessoal. ")
 }
+
+@Test func dictationAfterACharacterStartsWithASpace() {
+    #expect(textToPaste("Texto", after: .character(".")) == " Texto")
+}

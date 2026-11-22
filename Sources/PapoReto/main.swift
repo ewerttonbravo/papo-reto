@@ -309,18 +309,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func showHistory() {
         historyMenu.removeAllItems()
         for text in history.entries {
-            let item = NSMenuItem(title: historyTitle(text), action: #selector(copyDictation(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: historyTitle(text), action: #selector(pasteDictation(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = text
             historyMenu.addItem(item)
         }
     }
 
-    /// A plain copy, unlike the paste: the user asked for it, so clipboard managers may keep it.
-    @objc private func copyDictation(_ sender: NSMenuItem) {
+    /// Pastes at the cursor of the app the menu was opened over, and leaves the text on the
+    /// clipboard: with no text field in focus it is still there for Cmd+V. A plain copy, unlike
+    /// the dictation's: the user asked for it, so clipboard managers may keep it.
+    @objc private func pasteDictation(_ sender: NSMenuItem) {
         guard let text = sender.representedObject as? String else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+        SystemKeyboard().pressCmdV()
     }
 
     @objc private func chooseMicrophone(_ sender: NSMenuItem) {

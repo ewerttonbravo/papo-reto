@@ -3,7 +3,7 @@
 ## Product
 Voice dictation for macOS and Windows (ADR-027), focused on PT-BR, 100% local and open source (MIT). Hold `Fn`, speak, release: the text appears at the cursor. A free alternative to Wispr Flow, inspired by [Arara](https://github.com/davimatosms/Arara-voice), but native and lightweight.
 
-MVP: menu bar (no Dock, no window), icon per state (loading / ready / recording / transcribing), menu with microphones and "Quit". Out of scope without an explicit request: Linux, cloud, model switching, history, dictionary, themes, live preview, auto-update, onboarding, configurable shortcut.
+MVP: menu bar (no Dock, no window), icon per state (loading / ready / recording / transcribing), menu with the last 10 dictations ("Recent", memory only, ADR-034), microphones and "Quit". Out of scope without an explicit request: Linux, cloud, model switching, dictionary, themes, live preview, auto-update, onboarding, configurable shortcut.
 
 ## Principles
 1. **Brutally simple.** A new feature must justify its existence. When in doubt, leave it out.

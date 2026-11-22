@@ -1,3 +1,5 @@
+import Foundation
+
 /// The latest dictations, newest first. Memory only (ADR-034): quitting the app clears it.
 public struct DictationHistory {
     public static let limit = 10
@@ -13,5 +15,6 @@ public struct DictationHistory {
 
 /// The dictation's title in the Recent menu, short enough to keep the menu narrow.
 public func historyTitle(_ text: String) -> String {
-    text.count > 50 ? text.prefix(50) + "…" : text
+    guard text.count > 50 else { return text }
+    return text.prefix(50).trimmingCharacters(in: .whitespaces) + "…"
 }

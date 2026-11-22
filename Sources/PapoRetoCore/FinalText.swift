@@ -18,8 +18,8 @@ public struct TextAroundCursor: Sendable {
     }
 }
 
-/// What goes to the cursor: a space before when the text would stick to a word. A field that
-/// cannot be read (nil) gets one at the end instead, so the next dictation does not stick to this one.
+/// What goes to the cursor: a space before unless whitespace precedes it, a space after only before
+/// a letter or number. A field that cannot be read (nil) gets one at the end, as in T19.
 public func textToPaste(_ text: String, around: TextAroundCursor?) -> String {
     guard let around else { return text + " " }
     let leading = around.before.map { !$0.isWhitespace } ?? false

@@ -22,6 +22,7 @@ public struct TextAroundCursor: Sendable {
 /// cannot be read (nil) gets one at the end instead, so the next dictation does not stick to this one.
 public func textToPaste(_ text: String, around: TextAroundCursor?) -> String {
     guard let around else { return text + " " }
-    guard let before = around.before, !before.isWhitespace else { return text }
-    return " " + text
+    let leading = around.before.map { !$0.isWhitespace } ?? false
+    let trailing = around.after != nil
+    return (leading ? " " : "") + text + (trailing ? " " : "")
 }

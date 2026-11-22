@@ -23,6 +23,6 @@ public struct TextAroundCursor: Sendable {
 public func textToPaste(_ text: String, around: TextAroundCursor?) -> String {
     guard let around else { return text + " " }
     let leading = around.before.map { !$0.isWhitespace } ?? false
-    let trailing = around.after != nil
+    let trailing = around.after.map { $0.isLetter || $0.isNumber } ?? false
     return (leading ? " " : "") + text + (trailing ? " " : "")
 }

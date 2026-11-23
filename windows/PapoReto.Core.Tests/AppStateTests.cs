@@ -6,6 +6,8 @@ public class AppStateTests
     static readonly AppState Recording = Ready with { Activity = AppState.ActivityState.Recording };
     static readonly AppState Transcribing = Ready with { Activity = AppState.ActivityState.Transcribing };
     static readonly AppState HandsFree = Ready with { Activity = AppState.ActivityState.HandsFree };
+    // AltGr still down from the double tap's second press.
+    static readonly AppState HandsFreeHeld = Ready with { Activity = AppState.ActivityState.HandsFreeHeld };
     static readonly AppState AfterTap = Ready with { AfterTap = true };
 
     static TimeSpan Ms(int ms) => TimeSpan.FromMilliseconds(ms);
@@ -93,7 +95,7 @@ public class AppStateTests
     public void HotkeyPressedUnder400msAfterATapStartsHandsFree()
     {
         var (next, effects) = AfterTap.Handling(new AppEvent.HotkeyPressed(Ms(399)));
-        Assert.Equal(HandsFree, next);
+        Assert.Equal(HandsFreeHeld, next);
         Assert.Equal(TrayIcon.Listening, next.Icon);
         Assert.Equal(new[] { AppEffect.StartRecording }, effects);
     }
@@ -136,8 +138,9 @@ public class AppStateTests
     [InlineData(300)]
     public void HotkeyTappedInHandsFreeKeepsRecording(int heldMs)
     {
-        var (next, effects) = HandsFree.Handling(new AppEvent.HotkeyReleased(Ms(heldMs)));
+        var (next, effects) = HandsFreeHeld.Handling(new AppEvent.HotkeyReleased(Ms(heldMs)));
         Assert.Equal(HandsFree, next);
+        Assert.Equal(TrayIcon.Listening, next.Icon);
         Assert.Empty(effects);
     }
 
@@ -145,7 +148,7 @@ public class AppStateTests
     [Fact]
     public void HotkeyHeldOver300msInHandsFreeStopsAndTranscribes()
     {
-        var (next, effects) = HandsFree.Handling(new AppEvent.HotkeyReleased(Ms(301)));
+        var (next, effects) = HandsFreeHeld.Handling(new AppEvent.HotkeyReleased(Ms(301)));
         Assert.Equal(Transcribing, next);
         Assert.Equal(new[] { AppEffect.StopRecording, AppEffect.Transcribe }, effects);
     }
@@ -223,7 +226,7 @@ public class AppStateTests
         Assert.Empty(effects);
     }
 
-    public static TheoryData<AppState> RecordingStates => new() { Recording, HandsFree };
+    public static TheoryData<AppState> RecordingStates => new() { Recording, HandsFreeHeld, HandsFree };
 
     [Theory]
     [MemberData(nameof(RecordingStates))]
@@ -270,6 +273,15 @@ public class AppStateTests
     {
         var (next, effects) = RecordingWhileLoading.Handling(new AppEvent.KeyPressed(isEscape));
         Assert.Equal(Loading, next);
+        Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    /// <summary>A stray tap then AltGr+Q to type "/" on ABNT2 must not leave a silent hands-free running.</summary>
+    [Fact]
+    public void KeyBeforeReleasingTheDoubleTapCancels()
+    {
+        var (next, effects) = HandsFreeHeld.Handling(new AppEvent.KeyPressed(IsEscape: false));
+        Assert.Equal(Ready, next);
         Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
     }
 

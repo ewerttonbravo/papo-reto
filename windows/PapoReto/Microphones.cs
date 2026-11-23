@@ -15,26 +15,34 @@ static class Microphones
     /// <summary>Empty when Windows cannot list them: the menu still offers the default.</summary>
     public static List<InputDevice> Active()
     {
+        var active = new List<InputDevice>();
         try
         {
             using var devices = new MMDeviceEnumerator();
-            return devices.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active).Select(d =>
-            {
-                using (d) return new InputDevice(d.ID, d.FriendlyName);
-            }).ToList();
+            foreach (var d in devices.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
+                using (d)
+                {
+                    // A driver whose properties fail to open costs only its own entry.
+                    try { active.Add(new InputDevice(d.ID, d.FriendlyName)); }
+                    catch (Exception e) { Log.Write("audio", $"Skipped a microphone: {e.Message}"); }
+                }
         }
         catch (Exception e)
         {
             Log.Write("audio", $"Could not list the microphones: {e.Message}");
-            return [];
         }
+        return active;
     }
 
     public static string? Load()
     {
         try { return File.ReadAllText(FilePath).Trim() is { Length: > 0 } id ? id : null; }
-        catch (IOException) { return null; }
-        catch (UnauthorizedAccessException) { return null; }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException) { return null; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Log.Write("audio", $"Could not read the saved microphone, using the system default: {e.Message}");
+            return null;
+        }
     }
 
     /// <summary>Null deletes the file: the app follows the Windows default.</summary>
@@ -43,7 +51,12 @@ static class Microphones
         try
         {
             if (id is null) File.Delete(FilePath);
-            else File.WriteAllText(FilePath, id);
+            else
+            {
+                // Deleting the folder is the cleanup: it may be gone while the app runs.
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+                File.WriteAllText(FilePath, id);
+            }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

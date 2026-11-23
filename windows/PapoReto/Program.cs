@@ -44,9 +44,11 @@ sealed class TrayContext : ApplicationContext
     public TrayContext()
     {
         menu.Items.Add(modelMissing);
-        menu.Items.Add(microphoneMenu);
+        // A child until the first opening, or the submenu shows no arrow.
+        microphoneMenu.DropDownItems.Add("System Default");
         // Listed on each opening, so a device plugged in later shows up without polling.
-        menu.Opening += (_, _) => ListMicrophones();
+        microphoneMenu.DropDownOpening += (_, _) => ListMicrophones();
+        menu.Items.Add(microphoneMenu);
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
         tray.ContextMenuStrip = menu;
         Render();
@@ -134,7 +136,7 @@ sealed class TrayContext : ApplicationContext
             catch (Exception e)
             {
                 // Gone between the listing and the start.
-                Log.Write("audio", $"Could not record from {hash}, using the system default: {e.Message}");
+                Log.Write("audio", $"Could not record from {hash} ({e.Message}), trying the system default");
             }
         }
         recorder.Start(null);
@@ -152,7 +154,9 @@ sealed class TrayContext : ApplicationContext
     {
         var active = Microphones.Active();
         var inUse = CurrentMicrophone(active)?.Id;
+        var old = microphoneMenu.DropDownItems.Cast<ToolStripItem>().ToList();
         microphoneMenu.DropDownItems.Clear();
+        old.ForEach(item => item.Dispose());
         microphoneMenu.DropDownItems.Add(MicrophoneChoice("System Default", null, inUse));
         foreach (var device in active) microphoneMenu.DropDownItems.Add(MicrophoneChoice(device.Name, device.Id, inUse));
     }

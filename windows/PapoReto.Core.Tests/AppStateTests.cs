@@ -5,6 +5,10 @@ public class AppStateTests
     static readonly AppState Ready = new() { Model = AppState.ModelState.Ready };
     static readonly AppState Recording = Ready with { Activity = AppState.ActivityState.Recording };
     static readonly AppState Transcribing = Ready with { Activity = AppState.ActivityState.Transcribing };
+    static readonly AppState HandsFree = Ready with { Activity = AppState.ActivityState.HandsFree };
+    // AltGr still down from the double tap's second press.
+    static readonly AppState HandsFreeHeld = Ready with { Activity = AppState.ActivityState.HandsFreeHeld };
+    static readonly AppState AfterTap = Ready with { AfterTap = true };
 
     static TimeSpan Ms(int ms) => TimeSpan.FromMilliseconds(ms);
 
@@ -62,7 +66,7 @@ public class AppStateTests
     [Fact]
     public void HotkeyPressedWhenReadyStartsRecording()
     {
-        var (next, effects) = Ready.Handling(new AppEvent.HotkeyPressed());
+        var (next, effects) = Ready.Handling(new AppEvent.HotkeyPressed(SinceRelease: null));
         Assert.Equal(Recording, next);
         Assert.Equal(TrayIcon.Listening, next.Icon);
         Assert.Equal(new[] { AppEffect.StartRecording }, effects);
@@ -83,8 +87,70 @@ public class AppStateTests
     public void HotkeyHeldUpTo300msDiscardsTheRecording(int heldMs)
     {
         var (next, effects) = Recording.Handling(new AppEvent.HotkeyReleased(Ms(heldMs)));
-        Assert.Equal(Ready, next);
+        Assert.Equal(AfterTap, next);
         Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    [Fact]
+    public void HotkeyPressedUnder400msAfterATapStartsHandsFree()
+    {
+        var (next, effects) = AfterTap.Handling(new AppEvent.HotkeyPressed(Ms(399)));
+        Assert.Equal(HandsFreeHeld, next);
+        Assert.Equal(TrayIcon.Listening, next.Icon);
+        Assert.Equal(new[] { AppEffect.StartRecording }, effects);
+    }
+
+    [Fact]
+    public void HotkeyPressedFrom400msAfterATapStartsPushToTalk()
+    {
+        var (next, effects) = AfterTap.Handling(new AppEvent.HotkeyPressed(Ms(400)));
+        Assert.Equal(Recording, next);
+        Assert.Equal(new[] { AppEffect.StartRecording }, effects);
+    }
+
+    [Fact]
+    public void QuickPressWithoutATapStartsPushToTalk()
+    {
+        var (next, effects) = Ready.Handling(new AppEvent.HotkeyPressed(Ms(100)));
+        Assert.Equal(Recording, next);
+        Assert.Equal(new[] { AppEffect.StartRecording }, effects);
+    }
+
+    [Fact]
+    public void HotkeyPressedInHandsFreeStopsAndTranscribes()
+    {
+        var (next, effects) = HandsFree.Handling(new AppEvent.HotkeyPressed(TimeSpan.FromSeconds(5)));
+        Assert.Equal(Transcribing, next);
+        Assert.Equal(new[] { AppEffect.StopRecording, AppEffect.Transcribe }, effects);
+    }
+
+    [Fact]
+    public void HotkeyPressedInHandsFreeWhileLoadingWaitsForTheModel()
+    {
+        var state = new AppState { Activity = AppState.ActivityState.HandsFree };
+        var (next, effects) = state.Handling(new AppEvent.HotkeyPressed(TimeSpan.FromSeconds(5)));
+        Assert.Equal(new AppState { Activity = AppState.ActivityState.Transcribing }, next);
+        Assert.Equal(new[] { AppEffect.StopRecording }, effects);
+    }
+
+    [Theory]
+    [InlineData(100)]
+    [InlineData(300)]
+    public void HotkeyTappedInHandsFreeKeepsRecording(int heldMs)
+    {
+        var (next, effects) = HandsFreeHeld.Handling(new AppEvent.HotkeyReleased(Ms(heldMs)));
+        Assert.Equal(HandsFree, next);
+        Assert.Equal(TrayIcon.Listening, next.Icon);
+        Assert.Empty(effects);
+    }
+
+    /// <summary>A tap then a hold to talk: the hold's release ends it like push-to-talk.</summary>
+    [Fact]
+    public void HotkeyHeldOver300msInHandsFreeStopsAndTranscribes()
+    {
+        var (next, effects) = HandsFreeHeld.Handling(new AppEvent.HotkeyReleased(Ms(301)));
+        Assert.Equal(Transcribing, next);
+        Assert.Equal(new[] { AppEffect.StopRecording, AppEffect.Transcribe }, effects);
     }
 
     [Fact]
@@ -111,7 +177,7 @@ public class AppStateTests
     [Fact]
     public void HotkeyPressedWhileLoadingStartsRecording()
     {
-        var (next, effects) = Loading.Handling(new AppEvent.HotkeyPressed());
+        var (next, effects) = Loading.Handling(new AppEvent.HotkeyPressed(SinceRelease: null));
         Assert.Equal(RecordingWhileLoading, next);
         Assert.Equal(new[] { AppEffect.StartRecording }, effects);
     }
@@ -155,15 +221,18 @@ public class AppStateTests
     [MemberData(nameof(HotkeyIgnoredStates))]
     public void HotkeyIgnoredWhenModelUnavailableTranscribingOrRecording(AppState state)
     {
-        var (next, effects) = state.Handling(new AppEvent.HotkeyPressed());
+        var (next, effects) = state.Handling(new AppEvent.HotkeyPressed(SinceRelease: null));
         Assert.Equal(state, next);
         Assert.Empty(effects);
     }
 
-    [Fact]
-    public void RecordingLimitStopsAndTranscribes()
+    public static TheoryData<AppState> RecordingStates => new() { Recording, HandsFreeHeld, HandsFree };
+
+    [Theory]
+    [MemberData(nameof(RecordingStates))]
+    public void RecordingLimitStopsAndTranscribes(AppState state)
     {
-        var (next, effects) = Recording.Handling(new AppEvent.RecordingLimitReached());
+        var (next, effects) = state.Handling(new AppEvent.RecordingLimitReached());
         Assert.Equal(Transcribing, next);
         Assert.Equal(new[] { AppEffect.StopRecording, AppEffect.Transcribe }, effects);
     }
@@ -196,13 +265,62 @@ public class AppStateTests
         Assert.Empty(effects);
     }
 
+    /// <summary>Recording means AltGr is held, so any key but a modifier is a combination: it never dictates.</summary>
     [Theory]
-    [InlineData(AppState.ModelState.Ready)]
-    [InlineData(AppState.ModelState.Loading)]
-    public void RecordingFailedGoesBackToIdle(AppState.ModelState model)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void KeyWhileHoldingHotkeyCancels(bool isEscape)
+    {
+        var (next, effects) = RecordingWhileLoading.Handling(new AppEvent.KeyPressed(isEscape));
+        Assert.Equal(Loading, next);
+        Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    /// <summary>A stray tap then AltGr+Q to type "/" on ABNT2 must not leave a silent hands-free running.</summary>
+    [Fact]
+    public void KeyBeforeReleasingTheDoubleTapCancels()
+    {
+        var (next, effects) = HandsFreeHeld.Handling(new AppEvent.KeyPressed(IsEscape: false));
+        Assert.Equal(Ready, next);
+        Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    [Fact]
+    public void EscInHandsFreeCancels()
+    {
+        var (next, effects) = HandsFree.Handling(new AppEvent.KeyPressed(IsEscape: true));
+        Assert.Equal(Ready, next);
+        Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    [Fact]
+    public void TypingInHandsFreeKeepsRecording()
+    {
+        var (next, effects) = HandsFree.Handling(new AppEvent.KeyPressed(IsEscape: false));
+        Assert.Equal(HandsFree, next);
+        Assert.Empty(effects);
+    }
+
+    public static TheoryData<AppState> EscIgnoredStates => new() { Ready, AfterTap, Transcribing, Loading };
+
+    [Theory]
+    [MemberData(nameof(EscIgnoredStates))]
+    public void EscOutsideRecordingIsIgnored(AppState state)
+    {
+        var (next, effects) = state.Handling(new AppEvent.KeyPressed(IsEscape: true));
+        Assert.Equal(state, next);
+        Assert.Empty(effects);
+    }
+
+    [Theory]
+    [InlineData(AppState.ModelState.Ready, AppState.ActivityState.Recording)]
+    [InlineData(AppState.ModelState.Loading, AppState.ActivityState.Recording)]
+    [InlineData(AppState.ModelState.Ready, AppState.ActivityState.HandsFreeHeld)]
+    [InlineData(AppState.ModelState.Ready, AppState.ActivityState.HandsFree)]
+    public void RecordingFailedGoesBackToIdle(AppState.ModelState model, AppState.ActivityState activity)
     {
         var state = new AppState { Model = model };
-        var (next, effects) = (state with { Activity = AppState.ActivityState.Recording }).Handling(new AppEvent.RecordingFailed());
+        var (next, effects) = (state with { Activity = activity }).Handling(new AppEvent.RecordingFailed());
         Assert.Equal(state, next);
         Assert.Empty(effects);
     }

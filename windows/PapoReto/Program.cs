@@ -67,7 +67,10 @@ sealed class TrayContext : ApplicationContext
         };
         try
         {
-            hotkey = new HotkeyMonitor(() => Apply(new AppEvent.HotkeyPressed()), held => Apply(new AppEvent.HotkeyReleased(held)));
+            hotkey = new HotkeyMonitor(
+                sinceRelease => Apply(new AppEvent.HotkeyPressed(sinceRelease)),
+                held => Apply(new AppEvent.HotkeyReleased(held)),
+                isEscape => Apply(new AppEvent.KeyPressed(isEscape)));
         }
         catch (Exception e)
         {
@@ -128,6 +131,7 @@ sealed class TrayContext : ApplicationContext
                 break;
             case AppEffect.DiscardRecording:
                 recordingLimit.Stop();
+                Log.Write("audio", "Recording discarded");
                 recorder.Stop();
                 pendingAudio = null;
                 break;

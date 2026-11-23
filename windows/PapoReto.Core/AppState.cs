@@ -9,6 +9,8 @@ public abstract record AppEvent
     public sealed record ModelFailed : AppEvent;
     /// <summary>A model file is absent or truncated: the adapter downloads it, verifies its SHA-256, then loads.</summary>
     public sealed record DownloadStarted : AppEvent;
+    /// <summary>The menu's Retry after a failed download or load.</summary>
+    public sealed record RetryRequested : AppEvent;
     /// <summary>Null on the first press since launch.</summary>
     public sealed record HotkeyPressed(TimeSpan? SinceRelease) : AppEvent;
     public sealed record HotkeyReleased(TimeSpan HeldFor) : AppEvent;
@@ -24,7 +26,8 @@ public abstract record AppEvent
 }
 
 /// <summary>What the adapters must do after a transition.</summary>
-public enum AppEffect { StartRecording, StopRecording, DiscardRecording, Transcribe, ReloadModel }
+/// <summary>PrepareModel: check every file's SHA-256 (Retry; the launch checks sizes), download what fails, then load.</summary>
+public enum AppEffect { StartRecording, StopRecording, DiscardRecording, Transcribe, ReloadModel, PrepareModel }
 
 /// <summary>Port of the Swift AppState, growing per task with only the transitions it uses.</summary>
 public sealed record AppState
@@ -68,6 +71,7 @@ public sealed record AppState
             (this with { Model = ModelState.Ready }, Activity == ActivityState.Transcribing ? [AppEffect.Transcribe] : []),
         (AppEvent.ModelFailed, ModelState.Loading or ModelState.Downloading, _) => DroppingAudio(ModelState.Unavailable),
         (AppEvent.DownloadStarted, ModelState.Loading, _) => DroppingAudio(ModelState.Downloading),
+        (AppEvent.RetryRequested, ModelState.Unavailable, _) => (new AppState(), [AppEffect.PrepareModel]),
         (AppEvent.HotkeyPressed p, ModelState.Loading or ModelState.Ready, ActivityState.Idle) =>
             (this with
             {

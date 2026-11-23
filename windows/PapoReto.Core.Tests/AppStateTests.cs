@@ -313,12 +313,14 @@ public class AppStateTests
     }
 
     [Theory]
-    [InlineData(AppState.ModelState.Ready)]
-    [InlineData(AppState.ModelState.Loading)]
-    public void RecordingFailedGoesBackToIdle(AppState.ModelState model)
+    [InlineData(AppState.ModelState.Ready, AppState.ActivityState.Recording)]
+    [InlineData(AppState.ModelState.Loading, AppState.ActivityState.Recording)]
+    [InlineData(AppState.ModelState.Ready, AppState.ActivityState.HandsFreeHeld)]
+    [InlineData(AppState.ModelState.Ready, AppState.ActivityState.HandsFree)]
+    public void RecordingFailedGoesBackToIdle(AppState.ModelState model, AppState.ActivityState activity)
     {
         var state = new AppState { Model = model };
-        var (next, effects) = (state with { Activity = AppState.ActivityState.Recording }).Handling(new AppEvent.RecordingFailed());
+        var (next, effects) = (state with { Activity = activity }).Handling(new AppEvent.RecordingFailed());
         Assert.Equal(state, next);
         Assert.Empty(effects);
     }

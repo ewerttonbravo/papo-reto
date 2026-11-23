@@ -81,7 +81,8 @@ public sealed record AppState
         (AppEvent.KeyPressed, _, ActivityState.Recording or ActivityState.HandsFreeHeld)
             or (AppEvent.KeyPressed { IsEscape: true }, _, ActivityState.HandsFree) =>
             (this with { Activity = ActivityState.Idle }, [AppEffect.DiscardRecording]),
-        (AppEvent.RecordingFailed, _, ActivityState.Recording) => (this with { Activity = ActivityState.Idle }, []),
+        (AppEvent.RecordingFailed, _, ActivityState.Recording or ActivityState.HandsFreeHeld or ActivityState.HandsFree) =>
+            (this with { Activity = ActivityState.Idle }, []),
         (AppEvent.Transcribed t, _, ActivityState.Transcribing) when t.PrivateMB >= ReloadAtPrivateMB =>
             (new AppState { Model = ModelState.Loading }, [AppEffect.ReloadModel]),
         (AppEvent.Transcribed, _, ActivityState.Transcribing) => (this with { Activity = ActivityState.Idle }, []),

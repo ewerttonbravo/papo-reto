@@ -26,8 +26,9 @@ sealed class TrayContext : ApplicationContext
     readonly NotifyIcon tray = new() { Text = "Papo Reto", Visible = true };
     // NotifyIcon.Dispose leaves its menu alive.
     readonly ContextMenuStrip menu = new();
-    // Until W07 downloads it, the model comes from the Mac's make win-bench.
-    readonly ToolStripMenuItem modelMissing = new("Model not found. Run make win-bench on the Mac") { Enabled = false };
+    // The download's progress, or the Retry after a failure; hidden otherwise.
+    readonly ToolStripMenuItem modelStatus = new();
+    string downloadStatus = "";
     readonly ToolStripMenuItem microphoneMenu = new("Microphone");
     readonly AudioRecorder recorder = new();
     readonly WindowsClipboard clipboard = new();
@@ -45,7 +46,8 @@ sealed class TrayContext : ApplicationContext
 
     public TrayContext()
     {
-        menu.Items.Add(modelMissing);
+        modelStatus.Click += (_, _) => Apply(new AppEvent.RetryRequested());
+        menu.Items.Add(modelStatus);
         // A child until the first opening, or the submenu shows no arrow.
         microphoneMenu.DropDownItems.Add("System Default");
         // Listed on each opening, so a device plugged in later shows up without polling.
@@ -77,12 +79,47 @@ sealed class TrayContext : ApplicationContext
             Log.Write("hotkey", $"Keyboard hook failed: {e.Message}");
         }
         AudioRecorder.WarmUp();
-        _ = LoadModel();
+        _ = PrepareModel(hashing: false);
+    }
+
+    /// <summary>Checks every file (by size; by SHA-256 on Retry), downloads the ones that fail, then loads.</summary>
+    async Task PrepareModel(bool hashing)
+    {
+        var dir = Transcriber.DefaultModelDir;
+        var clock = Stopwatch.StartNew();
+        var invalid = await Task.Run(() => hashing ? ModelStore.InvalidFiles(dir) : ModelStore.MissingFiles(dir));
+        Log.Write("model", $"Checked {(hashing ? "by SHA-256" : "by size")} in {clock.ElapsedMilliseconds} ms, {invalid.Count} files to download");
+        if (invalid.Count > 0)
+        {
+            // Else a Retry would show the last failure's percent until the first report.
+            downloadStatus = ParakeetModel.DownloadStatus(0, invalid.Sum(f => f.Bytes));
+            Apply(new AppEvent.DownloadStarted());
+            // Created here, on the UI thread, so each report is posted back to it in order.
+            var progress = new Progress<string>(status =>
+            {
+                downloadStatus = status;
+                Render();
+            });
+            clock.Restart();
+            try
+            {
+                // Off the UI thread: the hash of each 1 MB runs where the read resumes.
+                await Task.Run(() => ModelStore.Download(invalid, dir, progress));
+            }
+            catch (Exception e)
+            {
+                Log.Write("model", $"Download failed after {clock.Elapsed.TotalSeconds:F1} s: {e.GetType().Name}: {e.Message}");
+                Apply(new AppEvent.ModelFailed());
+                return;
+            }
+            Log.Write("model", $"Downloaded in {clock.Elapsed.TotalSeconds:F1} s");
+        }
+        await LoadModel();
     }
 
     async Task LoadModel()
     {
-        // A corrupt file can abort in native code: this line without a "Loaded" one says so (W07 hashes before loading).
+        // A corrupt file of the right size can abort in native code: this line without a "Loaded" one says so.
         Log.Write("model", "Loading");
         var clock = Stopwatch.StartNew();
         try
@@ -143,6 +180,9 @@ sealed class TrayContext : ApplicationContext
                 transcriber!.Dispose();
                 transcriber = null;
                 _ = LoadModel();
+                break;
+            case AppEffect.PrepareModel:
+                _ = PrepareModel(hashing: true);
                 break;
         }
     }
@@ -238,13 +278,17 @@ sealed class TrayContext : ApplicationContext
     void Render()
     {
         tray.Icon = IconFor(state.Icon);
-        modelMissing.Visible = state.Model == AppState.ModelState.Unavailable;
+        var unavailable = state.Model == AppState.ModelState.Unavailable;
+        modelStatus.Visible = unavailable || state.Model == AppState.ModelState.Downloading;
+        modelStatus.Enabled = unavailable;
+        modelStatus.Text = unavailable ? "Model unavailable. Retry" : downloadStatus;
     }
 
     // Provisional until W12 draws the profile.
     static Icon IconFor(TrayIcon icon) => icon switch
     {
         TrayIcon.Loading => SystemIcons.Application,
+        TrayIcon.Downloading => SystemIcons.Shield,
         TrayIcon.Ready => SystemIcons.Information,
         TrayIcon.Unavailable => SystemIcons.Warning,
         TrayIcon.Listening => SystemIcons.Error,

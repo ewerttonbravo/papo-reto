@@ -87,32 +87,34 @@ sealed class TrayContext : ApplicationContext
     {
         var dir = Transcriber.DefaultModelDir;
         var clock = Stopwatch.StartNew();
-        var invalid = await Task.Run(() => hashing ? ModelStore.InvalidFiles(dir) : ModelStore.MissingFiles(dir));
-        Log.Write("model", $"Checked {(hashing ? "by SHA-256" : "by size")} in {clock.ElapsedMilliseconds} ms, {invalid.Count} files to download");
-        if (invalid.Count > 0)
+        // The whole body: fire-and-forget would drop an exception and leave the menu with no Retry.
+        try
         {
-            // Else a Retry would show the last failure's percent until the first report.
-            downloadStatus = ParakeetModel.DownloadStatus(0, invalid.Sum(f => f.Bytes));
-            Apply(new AppEvent.DownloadStarted());
-            // Created here, on the UI thread, so each report is posted back to it in order.
-            var progress = new Progress<string>(status =>
+            var invalid = await Task.Run(() => hashing ? ModelStore.InvalidFiles(dir) : ModelStore.MissingFiles(dir));
+            Log.Write("model", $"Checked {(hashing ? "by SHA-256" : "by size")} in {clock.ElapsedMilliseconds} ms, {invalid.Count} files to download");
+            if (invalid.Count > 0)
             {
-                downloadStatus = status;
-                Render();
-            });
-            clock.Restart();
-            try
-            {
+                // Else a Retry would show the last failure's percent until the first report.
+                downloadStatus = ParakeetModel.DownloadStatus(0, invalid.Sum(f => f.Bytes));
+                Apply(new AppEvent.DownloadStarted());
+                // Created here, on the UI thread, so each report is posted back to it in order.
+                var progress = new Progress<string>(status =>
+                {
+                    downloadStatus = status;
+                    Render();
+                });
+                clock.Restart();
                 // Off the UI thread: the hash of each 1 MB runs where the read resumes.
                 await Task.Run(() => ModelStore.Download(invalid, dir, progress));
+                Log.Write("model", $"Downloaded in {clock.Elapsed.TotalSeconds:F1} s");
             }
-            catch (Exception e)
-            {
-                Log.Write("model", $"Download failed after {clock.Elapsed.TotalSeconds:F1} s: {e.GetType().Name}: {e.Message}");
-                Apply(new AppEvent.ModelFailed());
-                return;
-            }
-            Log.Write("model", $"Downloaded in {clock.Elapsed.TotalSeconds:F1} s");
+        }
+        catch (Exception e)
+        {
+            // The folder carries the Windows user name, and this log is what gets shared.
+            Log.Write("model", $"Model check or download failed after {clock.Elapsed.TotalSeconds:F1} s: {e.GetType().Name}: {e.Message.Replace(dir, "<model dir>")}");
+            Apply(new AppEvent.ModelFailed());
+            return;
         }
         await LoadModel();
     }

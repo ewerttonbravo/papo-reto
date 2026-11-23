@@ -59,7 +59,8 @@ static class ModelStore
             }
             finally
             {
-                File.Delete(part);
+                // Swallowed: an antivirus holding the file must not hide the real failure.
+                try { File.Delete(part); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             }
         }
     }

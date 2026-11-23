@@ -25,8 +25,8 @@ public abstract record AppEvent
     public sealed record RecordingLimitReached : AppEvent;
 }
 
-/// <summary>What the adapters must do after a transition.</summary>
-/// <summary>PrepareModel: check every file's SHA-256 (Retry; the launch checks sizes), download what fails, then load.</summary>
+/// <summary>What the adapters must do after a transition. PrepareModel: check every file's SHA-256
+/// (Retry; the launch checks sizes), download what fails, then load.</summary>
 public enum AppEffect { StartRecording, StopRecording, DiscardRecording, Transcribe, ReloadModel, PrepareModel }
 
 /// <summary>Port of the Swift AppState, growing per task with only the transitions it uses.</summary>

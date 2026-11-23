@@ -262,6 +262,44 @@ public class AppStateTests
         Assert.Empty(effects);
     }
 
+    /// <summary>Recording means AltGr is held, so any key but a modifier is a combination: it never dictates.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void KeyWhileHoldingHotkeyCancels(bool isEscape)
+    {
+        var (next, effects) = RecordingWhileLoading.Handling(new AppEvent.KeyPressed(isEscape));
+        Assert.Equal(Loading, next);
+        Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    [Fact]
+    public void EscInHandsFreeCancels()
+    {
+        var (next, effects) = HandsFree.Handling(new AppEvent.KeyPressed(IsEscape: true));
+        Assert.Equal(Ready, next);
+        Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    [Fact]
+    public void TypingInHandsFreeKeepsRecording()
+    {
+        var (next, effects) = HandsFree.Handling(new AppEvent.KeyPressed(IsEscape: false));
+        Assert.Equal(HandsFree, next);
+        Assert.Empty(effects);
+    }
+
+    public static TheoryData<AppState> EscIgnoredStates => new() { Ready, AfterTap, Transcribing, Loading };
+
+    [Theory]
+    [MemberData(nameof(EscIgnoredStates))]
+    public void EscOutsideRecordingIsIgnored(AppState state)
+    {
+        var (next, effects) = state.Handling(new AppEvent.KeyPressed(IsEscape: true));
+        Assert.Equal(state, next);
+        Assert.Empty(effects);
+    }
+
     [Theory]
     [InlineData(AppState.ModelState.Ready)]
     [InlineData(AppState.ModelState.Loading)]

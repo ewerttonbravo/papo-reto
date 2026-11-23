@@ -88,11 +88,20 @@ public class AppStateTests
     }
 
     [Fact]
-    public void TranscribedGoesBackToIdle()
+    public void TranscribedBelowTheMemoryLimitGoesBackToIdle()
     {
-        var (next, effects) = Transcribing.Handling(new AppEvent.Transcribed());
+        var (next, effects) = Transcribing.Handling(new AppEvent.Transcribed(PrivateMB: 1_299.9));
         Assert.Equal(Ready, next);
         Assert.Empty(effects);
+    }
+
+    [Fact]
+    public void TranscribedAtTheMemoryLimitReloadsTheModel()
+    {
+        var (next, effects) = Transcribing.Handling(new AppEvent.Transcribed(PrivateMB: 1_300));
+        Assert.Equal(new AppState(), next);
+        Assert.Equal(TrayIcon.Loading, next.Icon);
+        Assert.Equal(new[] { AppEffect.ReloadModel }, effects);
     }
 
     static readonly AppState Loading = new();

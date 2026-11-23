@@ -151,6 +151,42 @@ public class AppStateTests
         Assert.Empty(effects);
     }
 
+    [Fact]
+    public void RecordingLimitStopsAndTranscribes()
+    {
+        var (next, effects) = Recording.Handling(new AppEvent.RecordingLimitReached());
+        Assert.Equal(Transcribing, next);
+        Assert.Equal(new[] { AppEffect.StopRecording, AppEffect.Transcribe }, effects);
+    }
+
+    [Fact]
+    public void RecordingLimitWhileLoadingWaitsForTheModel()
+    {
+        var (next, effects) = RecordingWhileLoading.Handling(new AppEvent.RecordingLimitReached());
+        Assert.Equal(PendingWhileLoading, next);
+        Assert.Equal(new[] { AppEffect.StopRecording }, effects);
+    }
+
+    public static TheoryData<AppState> NotRecording => new() { Ready, Transcribing };
+
+    [Theory]
+    [MemberData(nameof(NotRecording))]
+    public void RecordingLimitOutsideRecordingIsIgnored(AppState state)
+    {
+        var (next, effects) = state.Handling(new AppEvent.RecordingLimitReached());
+        Assert.Equal(state, next);
+        Assert.Empty(effects);
+    }
+
+    [Fact]
+    public void HotkeyReleasedAfterTheLimitDoesNothing()
+    {
+        var (afterLimit, _) = Recording.Handling(new AppEvent.RecordingLimitReached());
+        var (next, effects) = afterLimit.Handling(new AppEvent.HotkeyReleased(Ms(130_000)));
+        Assert.Equal(Transcribing, next);
+        Assert.Empty(effects);
+    }
+
     [Theory]
     [InlineData(AppState.ModelState.Ready)]
     [InlineData(AppState.ModelState.Loading)]

@@ -106,6 +106,26 @@ public class AppStateTests
     }
 
     [Fact]
+    public void RetryRequestedWhenUnavailablePreparesTheModel()
+    {
+        var (next, effects) = new AppState { Model = AppState.ModelState.Unavailable }.Handling(new AppEvent.RetryRequested());
+        Assert.Equal(new AppState(), next);
+        Assert.Equal(new[] { AppEffect.PrepareModel }, effects);
+    }
+
+    public static TheoryData<AppState> RetryIgnoredStates => new() { new AppState(), Downloading, Ready };
+
+    /// <summary>A second click while the first retry runs must not start another download.</summary>
+    [Theory]
+    [MemberData(nameof(RetryIgnoredStates))]
+    public void RetryRequestedOutsideUnavailableIsIgnored(AppState state)
+    {
+        var (next, effects) = state.Handling(new AppEvent.RetryRequested());
+        Assert.Equal(state, next);
+        Assert.Empty(effects);
+    }
+
+    [Fact]
     public void HotkeyPressedWhenReadyStartsRecording()
     {
         var (next, effects) = Ready.Handling(new AppEvent.HotkeyPressed(SinceRelease: null));

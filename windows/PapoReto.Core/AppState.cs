@@ -12,6 +12,8 @@ public abstract record AppEvent
     public sealed record Transcribed : AppEvent;
     /// <summary>The microphone could not start (e.g. blocked in Windows privacy settings).</summary>
     public sealed record RecordingFailed : AppEvent;
+    /// <summary>The adapter's timer: RecordingLimit after the start.</summary>
+    public sealed record RecordingLimitReached : AppEvent;
 }
 
 /// <summary>What the adapters must do after a transition.</summary>
@@ -25,6 +27,9 @@ public sealed record AppState
 
     /// <summary>Holding the hotkey longer than this is push-to-talk (ADR-005); shorter is a tap.</summary>
     public static readonly TimeSpan HoldThreshold = TimeSpan.FromMilliseconds(300);
+    /// <summary>A recording stops by itself here and is transcribed whole, which bounds the RAM peak (ADR-016).
+    /// It also ends one whose release the hook never saw (the lock screen).</summary>
+    public static readonly TimeSpan RecordingLimit = TimeSpan.FromSeconds(120);
 
     public ModelState Model { get; init; } = ModelState.Loading;
     public ActivityState Activity { get; init; } = ActivityState.Idle;
@@ -47,14 +52,17 @@ public sealed record AppState
             (new AppState { Model = ModelState.Unavailable }, Activity == ActivityState.Idle ? [] : [AppEffect.DiscardRecording]),
         (AppEvent.HotkeyPressed, ModelState.Loading or ModelState.Ready, ActivityState.Idle) =>
             (this with { Activity = ActivityState.Recording }, [AppEffect.StartRecording]),
-        // Without the model the audio waits; ModelLoaded transcribes it.
-        (AppEvent.HotkeyReleased r, _, ActivityState.Recording) when r.HeldFor > HoldThreshold =>
-            (this with { Activity = ActivityState.Transcribing },
-                Model == ModelState.Ready ? [AppEffect.StopRecording, AppEffect.Transcribe] : [AppEffect.StopRecording]),
+        (AppEvent.HotkeyReleased r, _, ActivityState.Recording) when r.HeldFor > HoldThreshold => StoppingToTranscribe(),
+        (AppEvent.RecordingLimitReached, _, ActivityState.Recording) => StoppingToTranscribe(),
         (AppEvent.HotkeyReleased, _, ActivityState.Recording) =>
             (this with { Activity = ActivityState.Idle }, [AppEffect.DiscardRecording]),
         (AppEvent.RecordingFailed, _, ActivityState.Recording) => (this with { Activity = ActivityState.Idle }, []),
         (AppEvent.Transcribed, _, ActivityState.Transcribing) => (this with { Activity = ActivityState.Idle }, []),
         _ => (this, []),
     };
+
+    /// <summary>Without the model the audio waits; ModelLoaded transcribes it.</summary>
+    (AppState, AppEffect[]) StoppingToTranscribe() =>
+        (this with { Activity = ActivityState.Transcribing },
+            Model == ModelState.Ready ? [AppEffect.StopRecording, AppEffect.Transcribe] : [AppEffect.StopRecording]);
 }

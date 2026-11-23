@@ -1,12 +1,14 @@
 namespace PapoReto.Core;
 
 /// <summary>What the tray shows; the adapter maps each one to an icon.</summary>
-public enum TrayIcon { Loading, Ready, Unavailable, Listening, Thinking }
+public enum TrayIcon { Loading, Downloading, Ready, Unavailable, Listening, Thinking }
 
 public abstract record AppEvent
 {
     public sealed record ModelLoaded : AppEvent;
     public sealed record ModelFailed : AppEvent;
+    /// <summary>A model file is absent or truncated: the adapter downloads it, verifies its SHA-256, then loads.</summary>
+    public sealed record DownloadStarted : AppEvent;
     /// <summary>Null on the first press since launch.</summary>
     public sealed record HotkeyPressed(TimeSpan? SinceRelease) : AppEvent;
     public sealed record HotkeyReleased(TimeSpan HeldFor) : AppEvent;
@@ -27,7 +29,7 @@ public enum AppEffect { StartRecording, StopRecording, DiscardRecording, Transcr
 /// <summary>Port of the Swift AppState, growing per task with only the transitions it uses.</summary>
 public sealed record AppState
 {
-    public enum ModelState { Loading, Ready, Unavailable }
+    public enum ModelState { Loading, Downloading, Ready, Unavailable }
     /// <summary>HandsFreeHeld: AltGr still down from the double tap's second press, so a key is a combination.</summary>
     public enum ActivityState { Idle, Recording, HandsFreeHeld, HandsFree, Transcribing }
 
@@ -55,17 +57,17 @@ public sealed record AppState
         _ when Listening => TrayIcon.Listening,
         (ActivityState.Transcribing, _) => TrayIcon.Thinking,
         (_, ModelState.Loading) => TrayIcon.Loading,
+        (_, ModelState.Downloading) => TrayIcon.Downloading,
         (_, ModelState.Ready) => TrayIcon.Ready,
         _ => TrayIcon.Unavailable,
     };
 
     public (AppState State, AppEffect[] Effects) Handling(AppEvent e) => (e, Model, Activity) switch
     {
-        (AppEvent.ModelLoaded, ModelState.Loading, _) =>
+        (AppEvent.ModelLoaded, ModelState.Loading or ModelState.Downloading, _) =>
             (this with { Model = ModelState.Ready }, Activity == ActivityState.Transcribing ? [AppEffect.Transcribe] : []),
-        // Audio waiting for this model would wait forever: drop it.
-        (AppEvent.ModelFailed, ModelState.Loading, _) =>
-            (new AppState { Model = ModelState.Unavailable }, Activity == ActivityState.Idle ? [] : [AppEffect.DiscardRecording]),
+        (AppEvent.ModelFailed, ModelState.Loading or ModelState.Downloading, _) => DroppingAudio(ModelState.Unavailable),
+        (AppEvent.DownloadStarted, ModelState.Loading, _) => DroppingAudio(ModelState.Downloading),
         (AppEvent.HotkeyPressed p, ModelState.Loading or ModelState.Ready, ActivityState.Idle) =>
             (this with
             {
@@ -89,6 +91,10 @@ public sealed record AppState
         (AppEvent.Transcribed, _, ActivityState.Transcribing) => (this with { Activity = ActivityState.Idle }, []),
         _ => (this, []),
     };
+
+    /// <summary>Audio waiting for this model would wait forever (or for minutes): drop it.</summary>
+    (AppState, AppEffect[]) DroppingAudio(ModelState model) =>
+        (new AppState { Model = model }, Activity == ActivityState.Idle ? [] : [AppEffect.DiscardRecording]);
 
     /// <summary>Without the model the audio waits; ModelLoaded transcribes it.</summary>
     (AppState, AppEffect[]) StoppingToTranscribe() =>

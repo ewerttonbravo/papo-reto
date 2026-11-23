@@ -9,6 +9,7 @@ public class AppStateTests
     // AltGr still down from the double tap's second press.
     static readonly AppState HandsFreeHeld = Ready with { Activity = AppState.ActivityState.HandsFreeHeld };
     static readonly AppState AfterTap = Ready with { AfterTap = true };
+    static readonly AppState Downloading = new() { Model = AppState.ModelState.Downloading };
 
     static TimeSpan Ms(int ms) => TimeSpan.FromMilliseconds(ms);
 
@@ -41,7 +42,7 @@ public class AppStateTests
     [Fact]
     public void EveryStateHasADistinctIcon()
     {
-        var shown = new[] { new AppState(), Ready, new AppState { Model = AppState.ModelState.Unavailable }, Recording, Transcribing };
+        var shown = new[] { new AppState(), Ready, new AppState { Model = AppState.ModelState.Unavailable }, Downloading, Recording, Transcribing };
         Assert.Equal(shown.Length, shown.Select(s => s.Icon).Distinct().Count());
     }
 
@@ -61,6 +62,47 @@ public class AppStateTests
         var (next, effects) = state.Handling(e);
         Assert.Equal(state, next);
         Assert.Empty(effects);
+    }
+
+    [Fact]
+    public void DownloadStartedWhileLoadingGoesDownloading()
+    {
+        var (next, effects) = new AppState().Handling(new AppEvent.DownloadStarted());
+        Assert.Equal(Downloading, next);
+        Assert.Equal(TrayIcon.Downloading, next.Icon);
+        Assert.Empty(effects);
+    }
+
+    /// <summary>A press during the size check would otherwise wait minutes for the download.</summary>
+    [Theory]
+    [InlineData(AppState.ActivityState.Recording)]
+    [InlineData(AppState.ActivityState.HandsFreeHeld)]
+    [InlineData(AppState.ActivityState.HandsFree)]
+    [InlineData(AppState.ActivityState.Transcribing)]
+    public void DownloadStartedWithAudioDiscardsIt(AppState.ActivityState activity)
+    {
+        var (next, effects) = new AppState { Activity = activity }.Handling(new AppEvent.DownloadStarted());
+        Assert.Equal(Downloading, next);
+        Assert.Equal(new[] { AppEffect.DiscardRecording }, effects);
+    }
+
+    [Fact]
+    public void HotkeyPressedWhileDownloadingIsIgnored()
+    {
+        var (next, effects) = Downloading.Handling(new AppEvent.HotkeyPressed(SinceRelease: null));
+        Assert.Equal(Downloading, next);
+        Assert.Empty(effects);
+    }
+
+    [Fact]
+    public void ModelEventsWhileDownloadingFinishIt()
+    {
+        var (loaded, loadedEffects) = Downloading.Handling(new AppEvent.ModelLoaded());
+        Assert.Equal(Ready, loaded);
+        Assert.Empty(loadedEffects);
+        var (failed, failedEffects) = Downloading.Handling(new AppEvent.ModelFailed());
+        Assert.Equal(new AppState { Model = AppState.ModelState.Unavailable }, failed);
+        Assert.Empty(failedEffects);
     }
 
     [Fact]

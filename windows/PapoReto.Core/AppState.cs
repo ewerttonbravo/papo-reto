@@ -10,6 +10,9 @@ public abstract record AppEvent
     /// <summary>Null on the first press since launch.</summary>
     public sealed record HotkeyPressed(TimeSpan? SinceRelease) : AppEvent;
     public sealed record HotkeyReleased(TimeSpan HeldFor) : AppEvent;
+    /// <summary>Any key down but AltGr and the modifiers. Recording means AltGr is held, so any key cancels;
+    /// hands-free only Esc (ADR-017).</summary>
+    public sealed record KeyPressed(bool IsEscape) : AppEvent;
     /// <summary>The process's private bytes right after the transcription, in MB.</summary>
     public sealed record Transcribed(double PrivateMB) : AppEvent;
     /// <summary>The microphone could not start (e.g. blocked in Windows privacy settings).</summary>
@@ -72,6 +75,8 @@ public sealed record AppState
         (AppEvent.RecordingLimitReached, _, ActivityState.Recording or ActivityState.HandsFree) => StoppingToTranscribe(),
         (AppEvent.HotkeyReleased, _, ActivityState.Recording) =>
             (this with { Activity = ActivityState.Idle, AfterTap = true }, [AppEffect.DiscardRecording]),
+        (AppEvent.KeyPressed, _, ActivityState.Recording) or (AppEvent.KeyPressed { IsEscape: true }, _, ActivityState.HandsFree) =>
+            (this with { Activity = ActivityState.Idle }, [AppEffect.DiscardRecording]),
         (AppEvent.RecordingFailed, _, ActivityState.Recording) => (this with { Activity = ActivityState.Idle }, []),
         (AppEvent.Transcribed t, _, ActivityState.Transcribing) when t.PrivateMB >= ReloadAtPrivateMB =>
             (new AppState { Model = ModelState.Loading }, [AppEffect.ReloadModel]),

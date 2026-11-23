@@ -10,7 +10,7 @@ public abstract record AppEvent
     /// <summary>Null on the first press since launch.</summary>
     public sealed record HotkeyPressed(TimeSpan? SinceRelease) : AppEvent;
     public sealed record HotkeyReleased(TimeSpan HeldFor) : AppEvent;
-    /// <summary>Any key down but AltGr and the modifiers. Recording means AltGr is held, so any key cancels;
+    /// <summary>Any key down but AltGr and the modifiers. While AltGr is held any key cancels;
     /// hands-free only Esc (ADR-017).</summary>
     public sealed record KeyPressed(bool IsEscape) : AppEvent;
     /// <summary>The process's private bytes right after the transcription, in MB.</summary>
@@ -28,7 +28,8 @@ public enum AppEffect { StartRecording, StopRecording, DiscardRecording, Transcr
 public sealed record AppState
 {
     public enum ModelState { Loading, Ready, Unavailable }
-    public enum ActivityState { Idle, Recording, HandsFree, Transcribing }
+    /// <summary>HandsFreeHeld: AltGr still down from the double tap's second press, so a key is a combination.</summary>
+    public enum ActivityState { Idle, Recording, HandsFreeHeld, HandsFree, Transcribing }
 
     /// <summary>Holding the hotkey longer than this is push-to-talk (ADR-005); shorter is a tap.</summary>
     public static readonly TimeSpan HoldThreshold = TimeSpan.FromMilliseconds(300);
@@ -48,7 +49,7 @@ public sealed record AppState
 
     public TrayIcon Icon => (Activity, Model) switch
     {
-        (ActivityState.Recording or ActivityState.HandsFree, _) => TrayIcon.Listening,
+        (ActivityState.Recording or ActivityState.HandsFreeHeld or ActivityState.HandsFree, _) => TrayIcon.Listening,
         (ActivityState.Transcribing, _) => TrayIcon.Thinking,
         (_, ModelState.Loading) => TrayIcon.Loading,
         (_, ModelState.Ready) => TrayIcon.Ready,
@@ -65,17 +66,20 @@ public sealed record AppState
         (AppEvent.HotkeyPressed p, ModelState.Loading or ModelState.Ready, ActivityState.Idle) =>
             (this with
             {
-                Activity = AfterTap && p.SinceRelease < DoubleTapWindow ? ActivityState.HandsFree : ActivityState.Recording,
+                Activity = AfterTap && p.SinceRelease < DoubleTapWindow ? ActivityState.HandsFreeHeld : ActivityState.Recording,
                 AfterTap = false,
             }, [AppEffect.StartRecording]),
         (AppEvent.HotkeyPressed, _, ActivityState.HandsFree) => StoppingToTranscribe(),
-        // In hands-free, a tap then a hold to talk: the hold's release ends it like push-to-talk.
-        (AppEvent.HotkeyReleased r, _, ActivityState.Recording or ActivityState.HandsFree) when r.HeldFor > HoldThreshold =>
+        // A tap then a hold to talk: the hold's release ends it like push-to-talk.
+        (AppEvent.HotkeyReleased r, _, ActivityState.Recording or ActivityState.HandsFreeHeld) when r.HeldFor > HoldThreshold =>
             StoppingToTranscribe(),
-        (AppEvent.RecordingLimitReached, _, ActivityState.Recording or ActivityState.HandsFree) => StoppingToTranscribe(),
+        (AppEvent.RecordingLimitReached, _, ActivityState.Recording or ActivityState.HandsFreeHeld or ActivityState.HandsFree) =>
+            StoppingToTranscribe(),
         (AppEvent.HotkeyReleased, _, ActivityState.Recording) =>
             (this with { Activity = ActivityState.Idle, AfterTap = true }, [AppEffect.DiscardRecording]),
-        (AppEvent.KeyPressed, _, ActivityState.Recording) or (AppEvent.KeyPressed { IsEscape: true }, _, ActivityState.HandsFree) =>
+        (AppEvent.HotkeyReleased, _, ActivityState.HandsFreeHeld) => (this with { Activity = ActivityState.HandsFree }, []),
+        (AppEvent.KeyPressed, _, ActivityState.Recording or ActivityState.HandsFreeHeld)
+            or (AppEvent.KeyPressed { IsEscape: true }, _, ActivityState.HandsFree) =>
             (this with { Activity = ActivityState.Idle }, [AppEffect.DiscardRecording]),
         (AppEvent.RecordingFailed, _, ActivityState.Recording) => (this with { Activity = ActivityState.Idle }, []),
         (AppEvent.Transcribed t, _, ActivityState.Transcribing) when t.PrivateMB >= ReloadAtPrivateMB =>

@@ -28,6 +28,7 @@ sealed class TrayContext : ApplicationContext
     readonly ContextMenuStrip menu = new();
     // Until W07 downloads it, the model comes from the Mac's make win-bench.
     readonly ToolStripMenuItem modelMissing = new("Model not found. Run make win-bench on the Mac") { Enabled = false };
+    readonly ToolStripMenuItem microphoneMenu = new("Microphone");
     readonly AudioRecorder recorder = new();
     readonly WindowsClipboard clipboard = new();
     readonly WindowsKeyboard keyboard = new();
@@ -37,10 +38,15 @@ sealed class TrayContext : ApplicationContext
     Transcriber? transcriber;
     // Stopped audio waiting for the model or the transcription.
     Task<float[]>? pendingAudio;
+    // Endpoint ID; null follows the Windows default. Kept while the device is gone (ADR-015).
+    string? savedMicrophone = Microphones.Load();
 
     public TrayContext()
     {
         menu.Items.Add(modelMissing);
+        menu.Items.Add(microphoneMenu);
+        // Listed on each opening, so a device plugged in later shows up without polling.
+        menu.Opening += (_, _) => ListMicrophones();
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
         tray.ContextMenuStrip = menu;
         Render();
@@ -91,8 +97,8 @@ sealed class TrayContext : ApplicationContext
                 try
                 {
                     var clock = Stopwatch.StartNew();
-                    recorder.Start();
-                    Log.Write("audio", $"Recording started in {clock.ElapsedMilliseconds} ms");
+                    var source = StartRecorder();
+                    Log.Write("audio", $"Recording from {source} started in {clock.ElapsedMilliseconds} ms");
                 }
                 catch (Exception e)
                 {
@@ -112,6 +118,47 @@ sealed class TrayContext : ApplicationContext
                 break;
         }
     }
+
+    /// <summary>Returns what the log names: the chosen device's hash or the system default.</summary>
+    string StartRecorder()
+    {
+        // Without a saved choice there is nothing to look up.
+        if (savedMicrophone is not null && CurrentMicrophone(Microphones.Active()) is { } chosen)
+        {
+            var hash = Microphones.Hash(chosen.Name);
+            try
+            {
+                recorder.Start(chosen.Id);
+                return hash;
+            }
+            catch (Exception e)
+            {
+                // Gone between the listing and the start.
+                Log.Write("audio", $"Could not record from {hash}, using the system default: {e.Message}");
+            }
+        }
+        recorder.Start(null);
+        return "the system default";
+    }
+
+    /// <summary>The saved microphone while it is active; null records from the Windows default.</summary>
+    InputDevice? CurrentMicrophone(List<InputDevice> active)
+    {
+        var id = Microphone.InUse(savedMicrophone, active.Select(d => d.Id).ToList());
+        return active.Find(d => d.Id == id);
+    }
+
+    void ListMicrophones()
+    {
+        var active = Microphones.Active();
+        var inUse = CurrentMicrophone(active)?.Id;
+        microphoneMenu.DropDownItems.Clear();
+        microphoneMenu.DropDownItems.Add(MicrophoneChoice("System Default", null, inUse));
+        foreach (var device in active) microphoneMenu.DropDownItems.Add(MicrophoneChoice(device.Name, device.Id, inUse));
+    }
+
+    ToolStripMenuItem MicrophoneChoice(string title, string? id, string? inUse) =>
+        new(title, null, (_, _) => Microphones.Save(savedMicrophone = id)) { Checked = id == inUse };
 
     // The Core serializes transcriptions: one at a time on the resident recognizer.
     async Task Transcribe(Task<float[]> audio)

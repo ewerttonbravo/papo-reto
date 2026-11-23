@@ -3,7 +3,7 @@ using NAudio.Wave;
 
 namespace PapoReto;
 
-/// <summary>The default microphone, on only while recording. Windows converts to 16 kHz mono float (AutoConvertPcm); samples stay in memory.</summary>
+/// <summary>The chosen or default microphone, on only while recording. Windows converts to 16 kHz mono float (AutoConvertPcm); samples stay in memory.</summary>
 sealed class AudioRecorder
 {
     public const int SampleRate = 16000;
@@ -26,13 +26,15 @@ sealed class AudioRecorder
         catch (Exception e) { Log.Write("audio", $"No default microphone at launch: {e.Message}"); }
     }
 
-    /// <summary>Throws when there is no microphone or Windows privacy settings block it.</summary>
-    public void Start()
+    /// <summary>Records from the endpoint with this ID, or from the Windows default when null.
+    /// Throws when the device is gone or Windows privacy settings block it.</summary>
+    public void Start(string? deviceId)
     {
         // One per recording, so a recording that is still stopping never mixes into the next one.
         var samples = new List<float>();
         var done = new TaskCompletionSource<float[]>();
-        var c = new WasapiCapture { WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(SampleRate, 1) };
+        var c = CaptureFrom(deviceId);
+        c.WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(SampleRate, 1);
         c.DataAvailable += (_, e) =>
         {
             lock (samples)
@@ -54,6 +56,13 @@ sealed class AudioRecorder
         try { c.StartRecording(); }
         catch { c.Dispose(); throw; }
         (capture, stopped) = (c, done.Task);
+    }
+
+    static WasapiCapture CaptureFrom(string? deviceId)
+    {
+        if (deviceId is null) return new WasapiCapture();
+        using var devices = new MMDeviceEnumerator();
+        return new WasapiCapture(devices.GetDevice(deviceId));
     }
 
     /// <summary>Completes with the samples once the device has delivered its last buffer.</summary>

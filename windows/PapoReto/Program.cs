@@ -33,6 +33,8 @@ sealed class TrayContext : ApplicationContext
     readonly WindowsClipboard clipboard = new();
     readonly WindowsKeyboard keyboard = new();
     readonly HotkeyMonitor? hotkey;
+    // One shot per recording, on the UI thread; restarted at each start, so a stale one never cuts the next recording.
+    readonly System.Windows.Forms.Timer recordingLimit = new() { Interval = (int)AppState.RecordingLimit.TotalMilliseconds };
     AppState state = new();
     // Resident (ADR-003).
     Transcriber? transcriber;
@@ -53,6 +55,12 @@ sealed class TrayContext : ApplicationContext
         tray.ContextMenuStrip = menu;
         Render();
         recorder.Failed += () => Apply(new AppEvent.RecordingFailed());
+        recordingLimit.Tick += (_, _) =>
+        {
+            recordingLimit.Stop();
+            Log.Write("audio", "Recording limit reached");
+            Apply(new AppEvent.RecordingLimitReached());
+        };
         try
         {
             hotkey = new HotkeyMonitor(() => Apply(new AppEvent.HotkeyPressed()), held => Apply(new AppEvent.HotkeyReleased(held)));
@@ -100,6 +108,8 @@ sealed class TrayContext : ApplicationContext
                 {
                     var clock = Stopwatch.StartNew();
                     var source = StartRecorder();
+                    recordingLimit.Stop();
+                    recordingLimit.Start();
                     Log.Write("audio", $"Recording from {source} started in {clock.ElapsedMilliseconds} ms");
                 }
                 catch (Exception e)
@@ -109,14 +119,22 @@ sealed class TrayContext : ApplicationContext
                 }
                 break;
             case AppEffect.StopRecording:
+                recordingLimit.Stop();
                 pendingAudio = recorder.Stop();
                 break;
             case AppEffect.DiscardRecording:
+                recordingLimit.Stop();
                 recorder.Stop();
                 pendingAudio = null;
                 break;
             case AppEffect.Transcribe:
                 _ = Transcribe(pendingAudio!);
+                break;
+            case AppEffect.ReloadModel:
+                // Destroyed first: both at once would peak at twice the RAM (ADR-016).
+                transcriber!.Dispose();
+                transcriber = null;
+                _ = LoadModel();
                 break;
         }
     }
@@ -173,7 +191,7 @@ sealed class TrayContext : ApplicationContext
             var clock = Stopwatch.StartNew();
             var samples = await audio;
             var text = await Task.Run(() => transcriber!.Transcribe(samples, AudioRecorder.SampleRate));
-            Log.Write("dictation", $"{(double)samples.Length / AudioRecorder.SampleRate:F2} s of audio transcribed in {clock.Elapsed.TotalSeconds:F2} s");
+            Log.Write("dictation", $"{(double)samples.Length / AudioRecorder.SampleRate:F2} s of audio transcribed in {clock.Elapsed.TotalSeconds:F2} s, private {PrivateMB():F0} MB");
             // Back on the UI thread, which owns the clipboard's window.
             if (FinalText.Of(text) is { } final) _ = RestoreLater(Paster.Paste(final, clipboard, keyboard), clipboard);
         }
@@ -183,7 +201,16 @@ sealed class TrayContext : ApplicationContext
             Log.Write("dictation", $"Failed: {e.Message}");
         }
         pendingAudio = null;
-        Apply(new AppEvent.Transcribed());
+        var memory = PrivateMB();
+        if (memory >= AppState.ReloadAtPrivateMB) Log.Write("model", $"Reloading at {memory:F0} MB private");
+        Apply(new AppEvent.Transcribed(memory));
+    }
+
+    // Private bytes, as the bench reports: the working set is trimmed by Windows under pressure.
+    static double PrivateMB()
+    {
+        using var process = Process.GetCurrentProcess();
+        return process.PrivateMemorySize64 / 1e6;
     }
 
     static async Task RestoreLater<T>(PendingRestore<T> pending, IClipboard<T> clipboard)
@@ -221,6 +248,7 @@ sealed class TrayContext : ApplicationContext
     {
         // Hidden first, or the icon lingers in the tray until the mouse passes over it.
         hotkey?.Dispose();
+        recordingLimit.Dispose();
         clipboard.Dispose();
         tray.Visible = false;
         tray.Dispose();

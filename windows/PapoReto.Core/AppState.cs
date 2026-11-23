@@ -47,9 +47,12 @@ public sealed record AppState
     /// <summary>The last release was a tap; the next press consumes it.</summary>
     public bool AfterTap { get; init; }
 
+    /// <summary>The microphone is on: push-to-talk or hands-free.</summary>
+    bool Listening => Activity is ActivityState.Recording or ActivityState.HandsFreeHeld or ActivityState.HandsFree;
+
     public TrayIcon Icon => (Activity, Model) switch
     {
-        (ActivityState.Recording or ActivityState.HandsFreeHeld or ActivityState.HandsFree, _) => TrayIcon.Listening,
+        _ when Listening => TrayIcon.Listening,
         (ActivityState.Transcribing, _) => TrayIcon.Thinking,
         (_, ModelState.Loading) => TrayIcon.Loading,
         (_, ModelState.Ready) => TrayIcon.Ready,
@@ -73,16 +76,14 @@ public sealed record AppState
         // A tap then a hold to talk: the hold's release ends it like push-to-talk.
         (AppEvent.HotkeyReleased r, _, ActivityState.Recording or ActivityState.HandsFreeHeld) when r.HeldFor > HoldThreshold =>
             StoppingToTranscribe(),
-        (AppEvent.RecordingLimitReached, _, ActivityState.Recording or ActivityState.HandsFreeHeld or ActivityState.HandsFree) =>
-            StoppingToTranscribe(),
+        (AppEvent.RecordingLimitReached, _, _) when Listening => StoppingToTranscribe(),
         (AppEvent.HotkeyReleased, _, ActivityState.Recording) =>
             (this with { Activity = ActivityState.Idle, AfterTap = true }, [AppEffect.DiscardRecording]),
         (AppEvent.HotkeyReleased, _, ActivityState.HandsFreeHeld) => (this with { Activity = ActivityState.HandsFree }, []),
         (AppEvent.KeyPressed, _, ActivityState.Recording or ActivityState.HandsFreeHeld)
             or (AppEvent.KeyPressed { IsEscape: true }, _, ActivityState.HandsFree) =>
             (this with { Activity = ActivityState.Idle }, [AppEffect.DiscardRecording]),
-        (AppEvent.RecordingFailed, _, ActivityState.Recording or ActivityState.HandsFreeHeld or ActivityState.HandsFree) =>
-            (this with { Activity = ActivityState.Idle }, []),
+        (AppEvent.RecordingFailed, _, _) when Listening => (this with { Activity = ActivityState.Idle }, []),
         (AppEvent.Transcribed t, _, ActivityState.Transcribing) when t.PrivateMB >= ReloadAtPrivateMB =>
             (new AppState { Model = ModelState.Loading }, [AppEffect.ReloadModel]),
         (AppEvent.Transcribed, _, ActivityState.Transcribing) => (this with { Activity = ActivityState.Idle }, []),

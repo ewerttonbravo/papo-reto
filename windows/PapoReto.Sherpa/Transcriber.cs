@@ -4,7 +4,7 @@ using SherpaOnnx;
 namespace PapoReto.Sherpa;
 
 /// <summary>Parakeet TDT v3 through the sherpa-onnx NuGet. Load once, then one stream per transcription.</summary>
-public sealed class Transcriber
+public sealed class Transcriber : IDisposable
 {
     public static readonly string DefaultModelDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -43,6 +43,9 @@ public sealed class Transcriber
         recognizer.Decode(stream);
         return stream.Result.Text;
     }
+
+    /// <summary>Frees the recognizer's native memory, which the GC does not see.</summary>
+    public void Dispose() => recognizer.Dispose();
 
     // As on the Mac (hw.physicalcpu): in the spike, 8 threads on the 4-core i5-8250U were no faster than 4.
     static int PhysicalCores()

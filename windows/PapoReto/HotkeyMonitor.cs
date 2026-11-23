@@ -10,6 +10,8 @@ sealed class HotkeyMonitor : IDisposable
     const int WH_KEYBOARD_LL = 13;
     const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, WM_SYSKEYDOWN = 0x0104, WM_SYSKEYUP = 0x0105, WM_QUIT = 0x0012;
     const uint VK_RMENU = 0xA5;
+    /// <summary>dwExtraInfo of the keys the app sends itself ("PAPO"), which the hook ignores.</summary>
+    public const nuint OwnInput = 0x5041504F;
 
     readonly SynchronizationContext ui = SynchronizationContext.Current!;
     readonly Action pressed;
@@ -44,9 +46,8 @@ sealed class HotkeyMonitor : IDisposable
     // Windows silently removes a hook that is slow to return, so the work goes to the UI queue.
     IntPtr Callback(int code, IntPtr message, IntPtr data)
     {
-        if (code >= 0)
+        if (code >= 0 && Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(data) is var key && key.dwExtraInfo != OwnInput)
         {
-            var key = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(data);
             var msg = (int)message;
             if (key.vkCode == VK_RMENU && (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN) && downAt is null)
             {

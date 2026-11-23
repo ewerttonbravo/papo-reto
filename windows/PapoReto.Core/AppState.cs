@@ -9,13 +9,16 @@ public abstract record AppEvent
     public sealed record ModelFailed : AppEvent;
     public sealed record HotkeyPressed : AppEvent;
     public sealed record HotkeyReleased(TimeSpan HeldFor) : AppEvent;
-    public sealed record Transcribed : AppEvent;
+    /// <summary>The process's private bytes right after the transcription, in MB.</summary>
+    public sealed record Transcribed(double PrivateMB) : AppEvent;
     /// <summary>The microphone could not start (e.g. blocked in Windows privacy settings).</summary>
     public sealed record RecordingFailed : AppEvent;
+    /// <summary>The adapter's timer: RecordingLimit after the start.</summary>
+    public sealed record RecordingLimitReached : AppEvent;
 }
 
 /// <summary>What the adapters must do after a transition.</summary>
-public enum AppEffect { StartRecording, StopRecording, DiscardRecording, Transcribe }
+public enum AppEffect { StartRecording, StopRecording, DiscardRecording, Transcribe, ReloadModel }
 
 /// <summary>Port of the Swift AppState, growing per task with only the transitions it uses.</summary>
 public sealed record AppState
@@ -25,6 +28,12 @@ public sealed record AppState
 
     /// <summary>Holding the hotkey longer than this is push-to-talk (ADR-005); shorter is a tap.</summary>
     public static readonly TimeSpan HoldThreshold = TimeSpan.FromMilliseconds(300);
+    /// <summary>The recognizer keeps the RAM of the longest audio it saw; here it is recreated (ADR-038).
+    /// What the bench leaves after clips of up to 28 s, the Mac's rule (ADR-016).</summary>
+    public const double ReloadAtPrivateMB = 1_300;
+    /// <summary>A recording stops by itself here and is transcribed whole, which bounds the RAM peak (ADR-016).
+    /// It also ends one whose release the hook never saw (the lock screen).</summary>
+    public static readonly TimeSpan RecordingLimit = TimeSpan.FromSeconds(120);
 
     public ModelState Model { get; init; } = ModelState.Loading;
     public ActivityState Activity { get; init; } = ActivityState.Idle;
@@ -47,14 +56,19 @@ public sealed record AppState
             (new AppState { Model = ModelState.Unavailable }, Activity == ActivityState.Idle ? [] : [AppEffect.DiscardRecording]),
         (AppEvent.HotkeyPressed, ModelState.Loading or ModelState.Ready, ActivityState.Idle) =>
             (this with { Activity = ActivityState.Recording }, [AppEffect.StartRecording]),
-        // Without the model the audio waits; ModelLoaded transcribes it.
-        (AppEvent.HotkeyReleased r, _, ActivityState.Recording) when r.HeldFor > HoldThreshold =>
-            (this with { Activity = ActivityState.Transcribing },
-                Model == ModelState.Ready ? [AppEffect.StopRecording, AppEffect.Transcribe] : [AppEffect.StopRecording]),
+        (AppEvent.HotkeyReleased r, _, ActivityState.Recording) when r.HeldFor > HoldThreshold => StoppingToTranscribe(),
+        (AppEvent.RecordingLimitReached, _, ActivityState.Recording) => StoppingToTranscribe(),
         (AppEvent.HotkeyReleased, _, ActivityState.Recording) =>
             (this with { Activity = ActivityState.Idle }, [AppEffect.DiscardRecording]),
         (AppEvent.RecordingFailed, _, ActivityState.Recording) => (this with { Activity = ActivityState.Idle }, []),
+        (AppEvent.Transcribed t, _, ActivityState.Transcribing) when t.PrivateMB >= ReloadAtPrivateMB =>
+            (new AppState { Model = ModelState.Loading }, [AppEffect.ReloadModel]),
         (AppEvent.Transcribed, _, ActivityState.Transcribing) => (this with { Activity = ActivityState.Idle }, []),
         _ => (this, []),
     };
+
+    /// <summary>Without the model the audio waits; ModelLoaded transcribes it.</summary>
+    (AppState, AppEffect[]) StoppingToTranscribe() =>
+        (this with { Activity = ActivityState.Transcribing },
+            Model == ModelState.Ready ? [AppEffect.StopRecording, AppEffect.Transcribe] : [AppEffect.StopRecording]);
 }

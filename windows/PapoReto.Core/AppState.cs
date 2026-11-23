@@ -28,11 +28,11 @@ public sealed record AppState
 
     /// <summary>Holding the hotkey longer than this is push-to-talk (ADR-005); shorter is a tap.</summary>
     public static readonly TimeSpan HoldThreshold = TimeSpan.FromMilliseconds(300);
-    /// <summary>A recording stops by itself here and is transcribed whole, which bounds the RAM peak (ADR-016).
-    /// It also ends one whose release the hook never saw (the lock screen).</summary>
     /// <summary>The recognizer keeps the RAM of the longest audio it saw; here it is recreated (ADR-038).
     /// What the bench leaves after clips of up to 28 s, the Mac's rule (ADR-016).</summary>
     public const double ReloadAtPrivateMB = 1_300;
+    /// <summary>A recording stops by itself here and is transcribed whole, which bounds the RAM peak (ADR-016).
+    /// It also ends one whose release the hook never saw (the lock screen).</summary>
     public static readonly TimeSpan RecordingLimit = TimeSpan.FromSeconds(120);
 
     public ModelState Model { get; init; } = ModelState.Loading;

@@ -190,18 +190,22 @@ sealed class WindowsClipboard : IClipboard<List<(uint Format, byte[] Data)>>, ID
 sealed class WindowsKeyboard : IKeyboard
 {
     // Virtual keys, so V is V on every layout. Left Ctrl: AltGr already sends a Left Ctrl of its own.
-    const ushort VK_LCONTROL = 0xA2, VK_V = 0x56;
-    const uint INPUT_KEYBOARD = 1, KEYEVENTF_KEYUP = 2;
+    const ushort VK_LCONTROL = 0xA2, VK_RMENU = 0xA5, VK_V = 0x56;
+    const uint INPUT_KEYBOARD = 1, KEYEVENTF_EXTENDEDKEY = 1, KEYEVENTF_KEYUP = 2;
 
     public void PressCtrlV()
     {
-        INPUT[] inputs = [Key(VK_LCONTROL, 0), Key(VK_V, 0), Key(VK_V, KEYEVENTF_KEYUP), Key(VK_LCONTROL, KEYEVENTF_KEYUP)];
+        INPUT[] paste = [Key(VK_LCONTROL, 0), Key(VK_V, 0), Key(VK_V, KEYEVENTF_KEYUP), Key(VK_LCONTROL, KEYEVENTF_KEYUP)];
+        // The 2 min limit pastes with AltGr still held, which would make it Ctrl+Alt+V (Paste Special in Office).
+        INPUT[] inputs = GetAsyncKeyState(VK_RMENU) < 0 ? [Key(VK_RMENU, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP), .. paste] : paste;
         // Blocked by a UAC prompt or the lock screen, it pastes nothing and the restore still runs: only the log says so.
         if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>()) != inputs.Length)
             Log.Write("paste", $"Ctrl+V blocked: {new Win32Exception().Message}");
     }
 
-    static INPUT Key(ushort key, uint flags) => new() { type = INPUT_KEYBOARD, ki = new KEYBDINPUT { wVk = key, dwFlags = flags } };
+    // Tagged, so the hotkey hook does not take the injected AltGr release for the user's.
+    static INPUT Key(ushort key, uint flags) =>
+        new() { type = INPUT_KEYBOARD, ki = new KEYBDINPUT { wVk = key, dwFlags = flags, dwExtraInfo = HotkeyMonitor.OwnInput } };
 
     // The union is as large as MOUSEINPUT, its largest member: SendInput rejects any other size. Offset 8 is win-x64's.
     [StructLayout(LayoutKind.Explicit)]
@@ -230,4 +234,7 @@ sealed class WindowsKeyboard : IKeyboard
 
     [DllImport("user32.dll", SetLastError = true)]
     static extern uint SendInput(uint count, INPUT[] inputs, int size);
+
+    [DllImport("user32.dll")]
+    static extern short GetAsyncKeyState(int key);
 }

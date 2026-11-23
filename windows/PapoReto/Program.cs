@@ -54,7 +54,11 @@ sealed class TrayContext : ApplicationContext
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
         tray.ContextMenuStrip = menu;
         Render();
-        recorder.Failed += () => Apply(new AppEvent.RecordingFailed());
+        recorder.Failed += () =>
+        {
+            recordingLimit.Stop();
+            Apply(new AppEvent.RecordingFailed());
+        };
         recordingLimit.Tick += (_, _) =>
         {
             recordingLimit.Stop();
@@ -202,7 +206,7 @@ sealed class TrayContext : ApplicationContext
         }
         pendingAudio = null;
         var memory = PrivateMB();
-        if (memory >= AppState.ReloadAtPrivateMB) Log.Write("model", $"Reloading at {memory:F0} MB private");
+        if (memory >= AppState.ReloadAtPrivateMB) Log.Write("model", $"Reloading the model at {memory:F0} MB private");
         Apply(new AppEvent.Transcribed(memory));
     }
 

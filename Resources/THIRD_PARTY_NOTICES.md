@@ -16,7 +16,7 @@ Papo Reto is MIT-licensed (see `LICENSE`). The app bundles the components below;
 | Eigen, built into sherpa-onnx | 5.0.1 | MPL-2.0; source at the link | https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz |
 | ONNX Runtime (`libonnxruntime.dylib`, `onnxruntime.dll`) | 1.28.2 | MIT; its own third-party notices in `onnxruntime-ThirdPartyNotices.txt` | https://github.com/csukuangfj/onnxruntime-libs/releases/tag/v1.28.2 |
 | Silero VAD (`silero_vad.onnx`) | from sherpa-onnx's `asr-models` release | MIT | https://github.com/snakers4/silero-vad |
-| .NET runtime and Windows Forms, Windows only | 10.0 | MIT; its own third-party notices in `dotnet-THIRD-PARTY-NOTICES.txt` | https://github.com/dotnet/runtime, https://github.com/dotnet/winforms |
+| .NET runtime and Windows Forms, Windows only | 10.0 | MIT; the runtime's third-party notices in `dotnet-THIRD-PARTY-NOTICES.txt` (Windows Forms ships none) | https://github.com/dotnet/runtime, https://github.com/dotnet/winforms |
 | NAudio (`NAudio.Core.dll`, `NAudio.Wasapi.dll`), Windows only | 2.2.1 | MIT | https://github.com/naudio/NAudio |
 
 ## Speech model, downloaded on first launch (not in the app)

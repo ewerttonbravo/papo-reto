@@ -16,7 +16,7 @@
 - **Free:** MIT licensed, no account, no subscription, no word limit.
 - **Private:** audio and text never leave your Mac. The only network use is the one-time model download.
 - **PT-BR first:** built and tested with Brazilian Portuguese speech, punctuation included.
-- **Light:** a native menu bar app (36 MB without the model), 0% CPU while idle, and the microphone is on only while you dictate.
+- **Light:** a native menu bar app (36 MB without the model on macOS), 0% CPU while idle, and the microphone is on only while you dictate.
 
 ## How it works
 1. **Hold** `Fn` in any app.
@@ -36,7 +36,7 @@ For longer dictation, double-tap `Fn` to record hands-free and press `Fn` again 
 On Windows the key is `AltGr` (Right Alt), with the same hold, double tap and `Esc`, from an icon in the system tray. Windows has no start sound yet.
 
 ## Features
-- **Works in any app** with a text field: it pastes with Cmd+V, and your previous clipboard comes back right after.
+- **Works in any app** with a text field: it pastes with Cmd+V (Ctrl+V on Windows), and your previous clipboard comes back right after.
 - **Smart spacing** (macOS for now): reads the character on each side of the cursor, so consecutive dictations do not stick together and no stray spaces pile up.
 - **Recent** (macOS for now): the last 10 dictations in the menu bar, one click to paste again, so a dictation with no text field in focus is not lost. Kept in memory only.
 - **Ignores silence and noise:** a voice detector (Silero VAD) skips recordings with no speech, so nothing made up gets pasted.
@@ -67,7 +67,7 @@ On the first launch the app downloads the model (671 MB, from Hugging Face), wit
 - The app is signed ad-hoc, so each new version asks for Accessibility and the Microphone again (macOS ties permissions to the signature). The app clears its old Accessibility record itself.
 - The Windows app is not signed, so SmartScreen asks for "Run anyway" on the first launch of each new version. It has no Recent, smart spacing, sounds or Papo Reto icon yet.
 - The model was trained with more European than Brazilian Portuguese: very short phrases may come out in Spanish, and it adds punctuation even to a single word.
-- The model stays in memory for instant transcription: about 460 MB after loading. After a long dictation (from ~20 s) it reloads to give memory back (hourglass icon for a few seconds).
+- The model stays in memory for instant transcription: on macOS, about 460 MB after loading. After a long dictation (from ~20 s) it reloads to give memory back (hourglass icon for a few seconds); on Windows, once it holds 1.3 GB.
 - Apps that do not expose their text to Accessibility (some Electron editors, the Google search box in Safari) get a space at the end of each dictation instead of smart spacing.
 - A recording stops by itself at 2 minutes and is transcribed whole.
 
@@ -91,7 +91,7 @@ scripts/fetch-deps.sh model  # Parakeet TDT 0.6B v3 int8 (~670 MB, SHA-256 check
 make install  # builds the app and installs it in /Applications, quitting and reopening a running one
 make app    # builds build/PapoReto.app for local use
 make release  # ad-hoc zips for arm64 and x86_64 in build/release, each checked by scripts/check-release.sh
-make win-release  # then the win-x64 zip in build/release (needs the .NET 10 SDK), checked by scripts/check-win-release.sh
+make win-release  # the win-x64 zip in build/release (needs the .NET 10 SDK), checked by scripts/check-win-release.sh
 make showcase  # redraws the README and social preview images in assets/ after a change to the icon
 make run    # builds and opens the app
 ```

@@ -266,11 +266,12 @@ sealed class TrayContext : ApplicationContext
             var clock = Stopwatch.StartNew();
             var samples = await audio;
             var seconds = (double)samples.Length / AudioRecorder.SampleRate;
+            var check = Stopwatch.StartNew();
             var verdict = await Task.Run(() => AppState.AudioVerdictOf(samples.Length, AudioRecorder.SampleRate,
                 File.Exists(DetectorModel) ? () => ContainsSpeech(samples) : null));
             if (verdict != AudioVerdict.Transcribe)
                 // Nothing pasted; Transcribed still runs below, back to idle.
-                Log.Write("dictation", $"Skipped {seconds:F2} s of audio: {verdict}, checked in {clock.ElapsedMilliseconds} ms");
+                Log.Write("dictation", $"Skipped {seconds:F2} s of audio: {verdict}, checked in {check.ElapsedMilliseconds} ms");
             else
             {
                 var text = await Task.Run(() => transcriber!.Transcribe(samples, AudioRecorder.SampleRate));

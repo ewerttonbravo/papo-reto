@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using SherpaOnnx;
 
 namespace PapoReto.Sherpa;
@@ -6,12 +7,17 @@ namespace PapoReto.Sherpa;
 public sealed class SpeechDetector : IDisposable
 {
     const int Window = 512;
+    // The pin in scripts/fetch-deps.sh.
+    const string Sha256 = "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6";
     readonly VoiceActivityDetector detector;
 
     public SpeechDetector(string model)
     {
-        // The NuGet does not check the native handle: a missing file would crash later, in native code.
+        // The NuGet does not check the native handle: a missing, truncated or corrupt file gives a null detector
+        // that reports no speech, dropping every dictation. Failing here makes the app transcribe anyway (ADR-020).
         if (!File.Exists(model)) throw new FileNotFoundException($"No {Path.GetFileName(model)}");
+        if (Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(model))) != Sha256)
+            throw new InvalidDataException($"SHA-256 mismatch for {Path.GetFileName(model)}");
         // The Mac's settings (ADR-019): they tell every measured clip apart, and a short "sim" still counts.
         var config = new VadModelConfig();
         config.SileroVad.Model = model;

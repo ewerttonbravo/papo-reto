@@ -113,7 +113,8 @@ OTHER_ARCH := $(if $(filter x86_64,$(NATIVE_ARCH)),arm64,x86_64)
 # No xattrs in the zip: com.apple.provenance is this Mac's; the signature lives in the files.
 .PHONY: release
 release:
-	rm -rf build/release
+	@# Only the Mac zips: the win-x64 one from make win-release stays.
+	rm -f build/release/PapoReto-*-x86_64.zip build/release/PapoReto-*-arm64.zip
 	mkdir -p build/release
 	@for arch in $(OTHER_ARCH) $(NATIVE_ARCH); do \
 		zip=build/release/PapoReto-$(VERSION)-$$arch.zip; \
@@ -156,12 +157,24 @@ else
 	$(DOTNET) build windows/PapoReto.Bench
 endif
 
-# Self-contained folder; whether it ships as a folder or a single .exe is decided in W09.
-# The Silero VAD goes next to the exe, from the same pin as the Mac's (ADR-020).
-win-app: $(VAD_MODEL)
+# Self-contained folder, shipped as is (W09); the version is the Mac's, from Info.plist.
+# The Silero VAD goes next to the exe, from the same pin as the Mac's (ADR-020), and so do the notices,
+# with the .NET runtime's from the runtime pack the publish used.
+win-app: $(VAD_MODEL) $(ORT_NOTICES)
 	rm -rf build/windows/PapoReto
-	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -o build/windows/PapoReto
-	cp $(VAD_MODEL) build/windows/PapoReto/
+	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -p:Version=$(VERSION) -o build/windows/PapoReto
+	cp $(VAD_MODEL) $(NOTICES) build/windows/PapoReto/
+	@pack="$${NUGET_PACKAGES:-$$HOME/.nuget/packages}/microsoft.netcore.app.runtime.win-x64/$$(grep -o \
+		'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/[^"]*' build/windows/PapoReto/PapoReto.deps.json | head -1 | cut -d/ -f2)"; \
+	cp "$$pack/LICENSE.TXT" build/windows/PapoReto/dotnet-LICENSE.txt && \
+	cp "$$pack/THIRD-PARTY-NOTICES.TXT" build/windows/PapoReto/dotnet-THIRD-PARTY-NOTICES.txt
+
+.PHONY: win-release
+win-release: win-app
+	mkdir -p build/release
+	rm -f build/release/PapoReto-$(VERSION)-win-x64.zip
+	ditto -c -k --norsrc --noextattr --noacl --keepParent build/windows/PapoReto build/release/PapoReto-$(VERSION)-win-x64.zip
+	scripts/check-win-release.sh build/release/PapoReto-$(VERSION)-win-x64.zip
 
 # On the Windows test notebook (ADR-028): reports numbers, fails only when the text differs from the Mac's.
 WIN_HOST ?= icmsa@172.16.0.116

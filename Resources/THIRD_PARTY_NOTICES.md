@@ -1,10 +1,10 @@
 # Third-party notices
 
-Papo Reto is MIT-licensed (see `LICENSE`). The app bundles the components below; their licenses follow. In the app, this file and the two it names are in `PapoReto.app/Contents/Resources`.
+Papo Reto is MIT-licensed (see `LICENSE`). The app bundles the components below; their licenses follow. On macOS, this file and the two it names are in `PapoReto.app/Contents/Resources`; on Windows, they sit next to `PapoReto.exe`, with the .NET runtime's `dotnet-LICENSE.txt` and `dotnet-THIRD-PARTY-NOTICES.txt`.
 
 | Component | Version | License | Source |
 |---|---|---|---|
-| sherpa-onnx (`libsherpa-onnx-c-api.dylib`) | 2.0.1 | Apache-2.0, text in `sherpa-onnx-LICENSE.txt` | https://github.com/k2-fsa/sherpa-onnx |
+| sherpa-onnx (`libsherpa-onnx-c-api.dylib`, `sherpa-onnx-c-api.dll`, `sherpa-onnx.dll`) | 2.0.1 | Apache-2.0, text in `sherpa-onnx-LICENSE.txt` | https://github.com/k2-fsa/sherpa-onnx |
 | kaldi-native-fbank, built into sherpa-onnx | 1.22.4 | Apache-2.0 | https://github.com/csukuangfj/kaldi-native-fbank |
 | kaldi-decoder, built into sherpa-onnx | 0.3.0 | Apache-2.0 | https://github.com/k2-fsa/kaldi-decoder |
 | kaldifst, built into kaldi-decoder | 1.8.0 | Apache-2.0 | https://github.com/k2-fsa/kaldifst |
@@ -14,8 +14,10 @@ Papo Reto is MIT-licensed (see `LICENSE`). The app bundles the components below;
 | utf8proc, built into sherpa-onnx | 2.12.0 | MIT and Unicode data license | https://github.com/JuliaStrings/utf8proc |
 | hclust-cpp (fastcluster), built into sherpa-onnx | 2026-02-25 | BSD-2-Clause | https://github.com/csukuangfj/hclust-cpp |
 | Eigen, built into sherpa-onnx | 5.0.1 | MPL-2.0; source at the link | https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz |
-| ONNX Runtime (`libonnxruntime.dylib`) | 1.28.2 | MIT; its own third-party notices in `onnxruntime-ThirdPartyNotices.txt` | https://github.com/csukuangfj/onnxruntime-libs/releases/tag/v1.28.2 |
+| ONNX Runtime (`libonnxruntime.dylib`, `onnxruntime.dll`) | 1.28.2 | MIT; its own third-party notices in `onnxruntime-ThirdPartyNotices.txt` | https://github.com/csukuangfj/onnxruntime-libs/releases/tag/v1.28.2 |
 | Silero VAD (`silero_vad.onnx`) | from sherpa-onnx's `asr-models` release | MIT | https://github.com/snakers4/silero-vad |
+| .NET runtime and Windows Forms, Windows only | 10.0 | MIT; the runtime's third-party notices in `dotnet-THIRD-PARTY-NOTICES.txt` (Windows Forms ships none) | https://github.com/dotnet/runtime, https://github.com/dotnet/winforms |
+| NAudio (`NAudio.Core.dll`, `NAudio.Wasapi.dll`), Windows only | 2.2.1 | MIT | https://github.com/naudio/NAudio |
 
 ## Speech model, downloaded on first launch (not in the app)
 "Parakeet TDT 0.6B v3" by NVIDIA, licensed under CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/), from https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3. Papo Reto downloads the int8 ONNX export made by the sherpa-onnx project (https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8), a modification of the original model. It is provided as-is, without warranties, as the license states.
@@ -23,6 +25,8 @@ Papo Reto is MIT-licensed (see `LICENSE`). The app bundles the components below;
 ## MIT License
 Applies to:
 - ONNX Runtime: Copyright (c) Microsoft Corporation
+- .NET runtime and Windows Forms: Copyright (c) .NET Foundation and Contributors
+- NAudio: © Mark Heath 2023
 - Silero VAD: Copyright (c) 2020-present Silero Team
 - nlohmann/json: Copyright (c) 2013-2025 Niels Lohmann
 - utf8proc: Copyright © 2014-2021 by Steven G. Johnson, Jiahao Chen, Tony Kelman, Jonas Fonseca, and other contributors listed in the git history; Copyright (c) 2009, 2013 Public Software Group e. V., Berlin, Germany

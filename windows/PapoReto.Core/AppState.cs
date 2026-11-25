@@ -46,6 +46,12 @@ public sealed record AppState
     /// <summary>A recording stops by itself here and is transcribed whole, which bounds the RAM peak (ADR-016).
     /// It also ends one whose release the hook never saw (the lock screen).</summary>
     public static readonly TimeSpan RecordingLimit = TimeSpan.FromSeconds(120);
+    /// <summary>Shorter audio is a slip, not dictation, and the model makes words up for it (0.35 s → "It was").</summary>
+    public static readonly TimeSpan MinimumAudio = TimeSpan.FromMilliseconds(400);
+
+    public static bool IsLongEnough(int sampleCount, int sampleRate) =>
+        // In ticks, not a double: 6,400 samples are exactly the boundary.
+        (long)sampleCount * TimeSpan.TicksPerSecond / sampleRate >= MinimumAudio.Ticks;
 
     public ModelState Model { get; init; } = ModelState.Loading;
     public ActivityState Activity { get; init; } = ActivityState.Idle;

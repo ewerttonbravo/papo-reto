@@ -157,11 +157,16 @@ else
 endif
 
 # Self-contained folder, shipped as is (W09); the version is the Mac's, from Info.plist.
-# The Silero VAD goes next to the exe, from the same pin as the Mac's (ADR-020).
-win-app: $(VAD_MODEL)
+# The Silero VAD goes next to the exe, from the same pin as the Mac's (ADR-020), and so do the notices,
+# with the .NET runtime's from the runtime pack the publish used.
+win-app: $(VAD_MODEL) $(ORT_NOTICES)
 	rm -rf build/windows/PapoReto
 	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -p:Version=$(VERSION) -o build/windows/PapoReto
-	cp $(VAD_MODEL) build/windows/PapoReto/
+	cp $(VAD_MODEL) $(NOTICES) build/windows/PapoReto/
+	@pack="$${NUGET_PACKAGES:-$$HOME/.nuget/packages}/microsoft.netcore.app.runtime.win-x64/$$(grep -o \
+		'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/[0-9.]*' build/windows/PapoReto/PapoReto.deps.json | head -1 | cut -d/ -f2)"; \
+	cp "$$pack/LICENSE.TXT" build/windows/PapoReto/dotnet-LICENSE.txt && \
+	cp "$$pack/THIRD-PARTY-NOTICES.TXT" build/windows/PapoReto/dotnet-THIRD-PARTY-NOTICES.txt
 
 # After make release, which empties build/release.
 .PHONY: win-release

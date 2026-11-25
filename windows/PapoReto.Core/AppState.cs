@@ -29,6 +29,9 @@ public abstract record AppEvent
 /// (Retry; the launch checks sizes), download what fails, then load.</summary>
 public enum AppEffect { StartRecording, StopRecording, DiscardRecording, Transcribe, ReloadModel, PrepareModel }
 
+/// <summary>Whether a recording goes to the model; the model makes words up for slips and noise ("Yeah." from a Tink).</summary>
+public enum AudioVerdict { Transcribe, TooShort, NoSpeech }
+
 /// <summary>Port of the Swift AppState, growing per task with only the transitions it uses.</summary>
 public sealed record AppState
 {
@@ -52,6 +55,14 @@ public sealed record AppState
     public static bool IsLongEnough(int sampleCount, int sampleRate) =>
         // In ticks, not a double: 6,400 samples are exactly the boundary.
         (long)sampleCount * TimeSpan.TicksPerSecond / sampleRate >= MinimumAudio.Ticks;
+
+    /// <summary>Short audio skips the detector too. A null detector (no file next to the exe) transcribes:
+    /// never lose a dictation (ADR-020).</summary>
+    public static AudioVerdict AudioVerdictOf(int sampleCount, int sampleRate, Func<bool>? containsSpeech)
+    {
+        if (!IsLongEnough(sampleCount, sampleRate)) return AudioVerdict.TooShort;
+        return containsSpeech?.Invoke() == false ? AudioVerdict.NoSpeech : AudioVerdict.Transcribe;
+    }
 
     public ModelState Model { get; init; } = ModelState.Loading;
     public ActivityState Activity { get; init; } = ActivityState.Idle;

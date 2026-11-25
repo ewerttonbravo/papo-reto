@@ -113,7 +113,8 @@ OTHER_ARCH := $(if $(filter x86_64,$(NATIVE_ARCH)),arm64,x86_64)
 # No xattrs in the zip: com.apple.provenance is this Mac's; the signature lives in the files.
 .PHONY: release
 release:
-	rm -rf build/release
+	@# Only the Mac zips: the win-x64 one from make win-release stays.
+	rm -f build/release/PapoReto-*-x86_64.zip build/release/PapoReto-*-arm64.zip
 	mkdir -p build/release
 	@for arch in $(OTHER_ARCH) $(NATIVE_ARCH); do \
 		zip=build/release/PapoReto-$(VERSION)-$$arch.zip; \
@@ -164,11 +165,10 @@ win-app: $(VAD_MODEL) $(ORT_NOTICES)
 	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -p:Version=$(VERSION) -o build/windows/PapoReto
 	cp $(VAD_MODEL) $(NOTICES) build/windows/PapoReto/
 	@pack="$${NUGET_PACKAGES:-$$HOME/.nuget/packages}/microsoft.netcore.app.runtime.win-x64/$$(grep -o \
-		'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/[0-9.]*' build/windows/PapoReto/PapoReto.deps.json | head -1 | cut -d/ -f2)"; \
+		'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/[^"]*' build/windows/PapoReto/PapoReto.deps.json | head -1 | cut -d/ -f2)"; \
 	cp "$$pack/LICENSE.TXT" build/windows/PapoReto/dotnet-LICENSE.txt && \
 	cp "$$pack/THIRD-PARTY-NOTICES.TXT" build/windows/PapoReto/dotnet-THIRD-PARTY-NOTICES.txt
 
-# After make release, which empties build/release.
 .PHONY: win-release
 win-release: win-app
 	mkdir -p build/release

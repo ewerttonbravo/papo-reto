@@ -90,7 +90,11 @@ sealed class TrayContext : ApplicationContext
         // The whole body: fire-and-forget would drop an exception and leave the menu with no Retry.
         try
         {
-            var invalid = await Task.Run(() => hashing ? ModelStore.InvalidFiles(dir) : ModelStore.MissingFiles(dir));
+            var invalid = await Task.Run(() =>
+            {
+                ModelStore.DeleteLeftovers(dir);
+                return hashing ? ModelStore.InvalidFiles(dir) : ModelStore.MissingFiles(dir);
+            });
             Log.Write("model", $"Checked {(hashing ? "by SHA-256" : "by size")} in {clock.ElapsedMilliseconds} ms, {invalid.Count} files to download");
             if (invalid.Count > 0)
             {

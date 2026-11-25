@@ -21,6 +21,14 @@ static class ModelStore
     public static List<ModelFile> InvalidFiles(string dir) =>
         ParakeetModel.Files.Where(f => !f.IsValid(Sha256(Path.Combine(dir, f.Name)))).ToList();
 
+    /// <summary>A Quit during a download ends the process before its `finally`, leaving up to 652 MB behind.</summary>
+    public static void DeleteLeftovers(string dir)
+    {
+        if (!Directory.Exists(dir)) return;
+        foreach (var part in Directory.GetFiles(dir, "*.part"))
+            try { File.Delete(part); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+    }
+
     /// <summary>Each file goes to `name.part`, hashed as it is written, and is renamed only if the hash matches;
     /// an interrupted file starts over.</summary>
     public static async Task Download(List<ModelFile> files, string dir, IProgress<string> progress)

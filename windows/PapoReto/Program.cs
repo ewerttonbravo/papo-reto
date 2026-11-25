@@ -236,6 +236,27 @@ sealed class TrayContext : ApplicationContext
     ToolStripMenuItem MicrophoneChoice(string title, string? id, string? inUse) =>
         new(title, null, (_, _) => Microphones.Save(savedMicrophone = id)) { Checked = id == inUse };
 
+    /// <summary>Copied next to the exe by `make win-app` (ADR-020); absent under `dotnet run`, which then transcribes everything.</summary>
+    static readonly string DetectorModel = Path.Combine(AppContext.BaseDirectory, "silero_vad.onnx");
+
+    /// <summary>Created per dictation and disposed on return: no RAM at rest (ADR-020). A detector that fails says speech.</summary>
+    static bool ContainsSpeech(float[] samples)
+    {
+        var clock = Stopwatch.StartNew();
+        try
+        {
+            using var detector = new SpeechDetector(DetectorModel);
+            var found = detector.ContainsSpeech(samples);
+            if (found) Log.Write("dictation", $"Speech found in {clock.ElapsedMilliseconds} ms");
+            return found;
+        }
+        catch (Exception e)
+        {
+            Log.Write("dictation", $"Speech detector failed, transcribing anyway: {e.Message}");
+            return true;
+        }
+    }
+
     // The Core serializes transcriptions: one at a time on the resident recognizer.
     async Task Transcribe(Task<float[]> audio)
     {
@@ -244,10 +265,20 @@ sealed class TrayContext : ApplicationContext
             // From the stop, so the device's last buffer counts in what the user waits.
             var clock = Stopwatch.StartNew();
             var samples = await audio;
-            var text = await Task.Run(() => transcriber!.Transcribe(samples, AudioRecorder.SampleRate));
-            Log.Write("dictation", $"{(double)samples.Length / AudioRecorder.SampleRate:F2} s of audio transcribed in {clock.Elapsed.TotalSeconds:F2} s, private {PrivateMB():F0} MB");
-            // Back on the UI thread, which owns the clipboard's window.
-            if (FinalText.Of(text) is { } final) _ = RestoreLater(Paster.Paste(final, clipboard, keyboard), clipboard);
+            var seconds = (double)samples.Length / AudioRecorder.SampleRate;
+            var check = Stopwatch.StartNew();
+            var verdict = await Task.Run(() => AppState.AudioVerdictOf(samples.Length, AudioRecorder.SampleRate,
+                File.Exists(DetectorModel) ? () => ContainsSpeech(samples) : null));
+            if (verdict != AudioVerdict.Transcribe)
+                // Nothing pasted; Transcribed still runs below, back to idle.
+                Log.Write("dictation", $"Skipped {seconds:F2} s of audio: {verdict}, checked in {check.ElapsedMilliseconds} ms");
+            else
+            {
+                var text = await Task.Run(() => transcriber!.Transcribe(samples, AudioRecorder.SampleRate));
+                Log.Write("dictation", $"{seconds:F2} s of audio transcribed in {clock.Elapsed.TotalSeconds:F2} s, private {PrivateMB():F0} MB");
+                // Back on the UI thread, which owns the clipboard's window.
+                if (FinalText.Of(text) is { } final) _ = RestoreLater(Paster.Paste(final, clipboard, keyboard), clipboard);
+            }
         }
         catch (Exception e)
         {

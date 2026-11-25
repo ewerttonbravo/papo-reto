@@ -157,9 +157,11 @@ else
 endif
 
 # Self-contained folder; whether it ships as a folder or a single .exe is decided in W09.
-win-app:
+# The Silero VAD goes next to the exe, from the same pin as the Mac's (ADR-020).
+win-app: $(VAD_MODEL)
 	rm -rf build/windows/PapoReto
 	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -o build/windows/PapoReto
+	cp $(VAD_MODEL) build/windows/PapoReto/
 
 # On the Windows test notebook (ADR-028): reports numbers, fails only when the text differs from the Mac's.
 WIN_HOST ?= icmsa@172.16.0.116

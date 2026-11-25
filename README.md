@@ -57,7 +57,7 @@ On Windows the key is `AltGr` (Right Alt), with the same hold, double tap and `E
 ### Windows
 1. Download the `win-x64` zip from [Releases](https://github.com/ewerttonbravo/papo-reto/releases/latest). Requires Windows 10 or 11 on a 64-bit Intel or AMD PC; tested on Windows 11.
 2. Right-click it → "Extract All", into a folder you keep (for example, Documents). Keep the whole `PapoReto` folder: the app needs the files next to `PapoReto.exe`.
-3. Open `PapoReto.exe`. The app is not signed, so SmartScreen shows "Windows protected your PC": click "More info" → "Run anyway".
+3. Open `PapoReto.exe` from the extracted folder; opened from inside the zip, it fails without a message. The app is not signed, so SmartScreen shows "Windows protected your PC": click "More info" → "Run anyway".
 4. An icon appears in the system tray (click `^` next to the clock if it is hidden). Hold `AltGr` to dictate.
 
 On the first launch the app downloads the model (671 MB, from Hugging Face), with the progress in the menu, and checks each file's SHA-256.

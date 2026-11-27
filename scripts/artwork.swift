@@ -1,6 +1,7 @@
 // Draws the app's artwork from Sources/PapoReto/ProfileGlyph.swift, compiled with it by make, so every image shares one drawing:
 // icns writes the app icon, the listening profile on the Grafite squircle of papo-reto-docs/design/icone/previa.html;
-// showcase writes the README and social preview PNGs, committed in assets/ because GitHub serves them from the repo.
+// showcase writes the README and social preview PNGs, committed in assets/ because GitHub serves them from the repo;
+// ico writes the Windows tray profile per state in white and black, and the app icon for the exe (W12).
 import AppKit
 
 @main
@@ -11,8 +12,9 @@ enum Artwork {
         switch (args.count == 3 ? args[1] : nil, output) {
         case ("icns", let output?): try icns(output)
         case ("showcase", let output?): try showcase(output)
+        case ("ico", let output?): try ico(output)
         default:
-            FileHandle.standardError.write(Data("usage: artwork icns <AppIcon.icns> | artwork showcase <dir>\n".utf8))
+            FileHandle.standardError.write(Data("usage: artwork icns <AppIcon.icns> | artwork showcase <dir> | artwork ico <dir>\n".utf8))
             exit(2)
         }
     }
@@ -102,6 +104,61 @@ enum Artwork {
         if iconutil.terminationStatus != 0 { throw CocoaError(.fileWriteUnknown) }
     }
 
+    /// Tray sizes from 100% to 300% scaling; the app icon gets Explorer's sizes up to 256.
+    static func ico(_ dir: URL) throws {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        for (mark, state) in [(ProfileGlyph.Mark.none, "ready"), (.waves, "listening"), (.dots, "thinking")] {
+            for (ink, name) in [(rgb(0xffffff), "white"), (rgb(0x000000), "black")] {
+                let images = [16, 20, 24, 32, 40, 48].map { pixels in
+                    bitmap(width: pixels, height: pixels, scale: 1) {
+                        // The viewBox is wider than tall: its width fills the square, centered vertically.
+                        let scale = CGFloat(pixels) / ProfileGlyph.viewBox.width
+                        let glyph = NSAffineTransform()
+                        glyph.translateX(by: 0, yBy: (CGFloat(pixels) - ProfileGlyph.viewBox.height * scale) / 2)
+                        glyph.scale(by: scale)
+                        glyph.translateX(by: -ProfileGlyph.viewBox.minX, yBy: -ProfileGlyph.viewBox.minY)
+                        glyph.concat()
+                        ProfileGlyph.draw(mark, head: ink, wave: ink)
+                    }
+                }
+                try icoData(images).write(to: dir.appendingPathComponent("tray-\(state)-\(name).ico"))
+            }
+        }
+        let app = [16, 24, 32, 48, 64, 256].map { bitmap(width: 1024, height: 1024, scale: CGFloat($0) / 1024, drawIcon) }
+        try icoData(app).write(to: dir.appendingPathComponent("PapoReto.ico"))
+    }
+
+    /// Square images as 32 bpp DIB entries, and PNG for 256 px as Windows stores it.
+    static func icoData(_ images: [NSBitmapImageRep]) -> Data {
+        let entries = images.map { $0.pixelsWide >= 256 ? $0.representation(using: .png, properties: [:])! : dib($0) }
+        var data = le16(0) + le16(1) + le16(images.count)
+        var offset = 6 + 16 * images.count
+        for (image, entry) in zip(images, entries) {
+            let side = UInt8(image.pixelsWide >= 256 ? 0 : image.pixelsWide)  // 0 means 256
+            data += Data([side, side, 0, 0]) + le16(1) + le16(32) + le32(entry.count) + le32(offset)
+            offset += entry.count
+        }
+        return entries.reduce(data, +)
+    }
+
+    /// BITMAPINFOHEADER (height counts the AND mask too), BGRA rows bottom up with straight alpha, then an empty AND mask.
+    static func dib(_ image: NSBitmapImageRep) -> Data {
+        let side = image.pixelsWide
+        var data = le32(40) + le32(side) + le32(side * 2) + le16(1) + le16(32) + Data(count: 24)
+        for y in (0..<side).reversed() {
+            for x in 0..<side {
+                let pixel = image.bitmapData! + y * image.bytesPerRow + x * 4
+                let alpha = Int(pixel[3])
+                let straight = { (channel: UInt8) in UInt8(alpha == 0 ? 0 : min(255, Int(channel) * 255 / alpha)) }
+                data += Data([straight(pixel[2]), straight(pixel[1]), straight(pixel[0]), pixel[3]])
+            }
+        }
+        return data + Data(count: (side + 31) / 32 * 4 * side)
+    }
+
+    static func le16(_ value: Int) -> Data { withUnsafeBytes(of: UInt16(value).littleEndian) { Data($0) } }
+    static func le32(_ value: Int) -> Data { withUnsafeBytes(of: UInt32(value).littleEndian) { Data($0) } }
+
     static func iconPNG(pixels: Int) -> Data {
         png(width: 1024, height: 1024, scale: CGFloat(pixels) / 1024, drawIcon)
     }
@@ -122,6 +179,11 @@ enum Artwork {
 
     /// An sRGB PNG of width × height points at scale pixels per point, drawn y down.
     static func png(width: Int, height: Int, scale: CGFloat, _ draw: () -> Void) -> Data {
+        bitmap(width: width, height: height, scale: scale, draw).representation(using: .png, properties: [:])!
+    }
+
+    /// An sRGB bitmap with premultiplied RGBA bytes, drawn y down.
+    static func bitmap(width: Int, height: Int, scale: CGFloat, _ draw: () -> Void) -> NSBitmapImageRep {
         let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(CGFloat(width) * scale), pixelsHigh: Int(CGFloat(height) * scale),
                                       bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                       bytesPerRow: 0, bitsPerPixel: 0)!.retagging(with: .sRGB)!
@@ -133,7 +195,7 @@ enum Artwork {
         canvas.concat()
         draw()
         NSGraphicsContext.restoreGraphicsState()
-        return bitmap.representation(using: .png, properties: [:])!
+        return bitmap
     }
 
     static func rgb(_ hex: Int) -> NSColor {

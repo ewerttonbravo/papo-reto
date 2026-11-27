@@ -46,6 +46,8 @@ sealed class TrayContext : ApplicationContext
     string? savedMicrophone = Microphones.Load();
     // The profile .ico files next to the exe, each loaded once at the tray's size; null when absent or unreadable.
     readonly Dictionary<string, Icon?> profiles = [];
+    // Read at launch and when a preference changes, not at each render.
+    bool lightTaskbar = ReadLightTaskbar();
 
     public TrayContext()
     {
@@ -326,11 +328,15 @@ sealed class TrayContext : ApplicationContext
         modelStatus.Text = unavailable ? "Model unavailable. Retry" : downloadStatus;
     }
 
-    void OnPreferenceChanged(object sender, UserPreferenceChangedEventArgs e) => Render();
+    void OnPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        lightTaskbar = ReadLightTaskbar();
+        Render();
+    }
 
     Icon IconFor(TrayIcon icon)
     {
-        var file = TrayIcons.FileFor(icon, LightTaskbar());
+        var file = TrayIcons.FileFor(icon, lightTaskbar);
         return (file is null ? null : Profile(file)) ?? SystemIconFor(icon);
     }
 
@@ -350,9 +356,10 @@ sealed class TrayContext : ApplicationContext
         return profiles[file] = loaded;
     }
 
-    // Absent on a default Windows 10 or 11, whose taskbar is dark.
-    static bool LightTaskbar() =>
-        Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme", 0) is 1;
+    static bool ReadLightTaskbar() => TrayIcons.LightTaskbar(
+        SystemInformation.HighContrast,
+        SystemColors.Window.GetBrightness() > 0.5f,
+        Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme", null) as int?);
 
     // The rare states always, and any state whose profile file is missing.
     static Icon SystemIconFor(TrayIcon icon) => icon switch

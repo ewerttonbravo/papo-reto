@@ -7,8 +7,6 @@
     <UseWindowsForms>true</UseWindowsForms>
     <!-- Built on the Mac (ADR-027). -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <!-- Drawn by make win-app from the Mac's ProfileGlyph.swift (W12); CI builds on Ubuntu without AppKit, so without it. -->
-    <ApplicationIcon Condition="Exists('$(MSBuildThisFileDirectory)../../build/windows/icons/PapoReto.ico')">$(MSBuildThisFileDirectory)../../build/windows/icons/PapoReto.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../PapoReto.Core/PapoReto.Core.csproj" />

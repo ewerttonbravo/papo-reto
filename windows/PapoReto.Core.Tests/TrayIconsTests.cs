@@ -28,3 +28,23 @@ public class TrayIconsTests
         Assert.Null(TrayIcons.FileFor(icon, lightTaskbar: true));
     }
 }
+
+public class TaskbarInkTests
+{
+    [Fact]
+    public void LightThemeValueMeansALightTaskbar() =>
+        Assert.True(TrayIcons.LightTaskbar(highContrast: false, contrastBackgroundIsLight: false, systemUsesLightTheme: 1));
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(null)]
+    public void DarkOrAbsentThemeValueMeansADarkTaskbar(int? value) =>
+        Assert.False(TrayIcons.LightTaskbar(highContrast: false, contrastBackgroundIsLight: true, systemUsesLightTheme: value));
+
+    [Fact]
+    public void ContrastThemeFollowsItsOwnBackgroundOverTheThemeValue()
+    {
+        Assert.False(TrayIcons.LightTaskbar(highContrast: true, contrastBackgroundIsLight: false, systemUsesLightTheme: 1));
+        Assert.True(TrayIcons.LightTaskbar(highContrast: true, contrastBackgroundIsLight: true, systemUsesLightTheme: 0));
+    }
+}

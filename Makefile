@@ -163,13 +163,22 @@ else
 	$(DOTNET) build windows/PapoReto.Bench
 endif
 
+# The tray's profile per state and ink, and the exe's icon, drawn like the Mac's (W12).
+# A stamp written after every icon, so an interrupted run draws them again.
+WIN_ICONS := build/windows/icons
+$(WIN_ICONS)/.drawn: $(ARTWORK)
+	$(ARTWORK) ico $(WIN_ICONS)
+	@touch $@
+
 # Self-contained folder, shipped as is (W09); the version is the Mac's, from Info.plist.
 # The Silero VAD goes next to the exe, from the same pin as the Mac's (ADR-020), and so do the notices,
 # with the .NET runtime's from the runtime pack the publish used.
-win-app: $(VAD_MODEL) $(ORT_NOTICES)
+# The exe's icon comes from here, not the csproj: CI builds on Ubuntu without AppKit, and a missing one fails the publish.
+win-app: $(VAD_MODEL) $(ORT_NOTICES) $(WIN_ICONS)/.drawn
 	rm -rf build/windows/PapoReto
-	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -p:Version=$(VERSION) -o build/windows/PapoReto
-	cp $(VAD_MODEL) $(NOTICES) build/windows/PapoReto/
+	$(DOTNET) publish windows/PapoReto -c Release -r win-x64 --self-contained -p:Version=$(VERSION) \
+		-p:ApplicationIcon='$(CURDIR)/$(WIN_ICONS)/PapoReto.ico' -o build/windows/PapoReto
+	cp $(VAD_MODEL) $(NOTICES) $(WIN_ICONS)/tray-*.ico build/windows/PapoReto/
 	@pack="$${NUGET_PACKAGES:-$$HOME/.nuget/packages}/microsoft.netcore.app.runtime.win-x64/$$(grep -o \
 		'runtimepack.Microsoft.NETCore.App.Runtime.win-x64/[^"]*' build/windows/PapoReto/PapoReto.deps.json | head -1 | cut -d/ -f2)"; \
 	cp "$$pack/LICENSE.TXT" build/windows/PapoReto/dotnet-LICENSE.txt && \

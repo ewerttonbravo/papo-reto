@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Win32;
 using PapoReto.Core;
 using PapoReto.Sherpa;
 
@@ -43,6 +44,10 @@ sealed class TrayContext : ApplicationContext
     Task<float[]>? pendingAudio;
     // Endpoint ID; null follows the Windows default. Kept while the device is gone (ADR-015).
     string? savedMicrophone = Microphones.Load();
+    // The profile .ico files next to the exe, each loaded once at the tray's size; null when absent or unreadable.
+    readonly Dictionary<string, Icon?> profiles = [];
+    // Read at launch and when a preference changes, not at each render.
+    bool lightTaskbar = ReadLightTaskbar();
 
     public TrayContext()
     {
@@ -55,6 +60,8 @@ sealed class TrayContext : ApplicationContext
         menu.Items.Add(microphoneMenu);
         menu.Items.Add("Quit", null, (_, _) => ExitThread());
         tray.ContextMenuStrip = menu;
+        // The taskbar's light or dark theme picks the profile's ink.
+        SystemEvents.UserPreferenceChanged += OnPreferenceChanged;
         Render();
         recorder.Failed += () =>
         {
@@ -321,8 +328,41 @@ sealed class TrayContext : ApplicationContext
         modelStatus.Text = unavailable ? "Model unavailable. Retry" : downloadStatus;
     }
 
-    // Provisional until W12 draws the profile.
-    static Icon IconFor(TrayIcon icon) => icon switch
+    void OnPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        lightTaskbar = ReadLightTaskbar();
+        Render();
+    }
+
+    Icon IconFor(TrayIcon icon)
+    {
+        var file = TrayIcons.FileFor(icon, lightTaskbar);
+        return (file is null ? null : Profile(file)) ?? SystemIconFor(icon);
+    }
+
+    Icon? Profile(string file)
+    {
+        if (profiles.TryGetValue(file, out var cached)) return cached;
+        Icon? loaded = null;
+        try
+        {
+            loaded = new Icon(Path.Combine(AppContext.BaseDirectory, file), SystemInformation.SmallIconSize);
+            Log.Write("icon", $"{file} at {loaded.Width} px");
+        }
+        catch (Exception e)
+        {
+            Log.Write("icon", $"{file} unavailable, using the system icon: {e.Message}");
+        }
+        return profiles[file] = loaded;
+    }
+
+    static bool ReadLightTaskbar() => TrayIcons.LightTaskbar(
+        SystemInformation.HighContrast,
+        SystemColors.Window.GetBrightness() > 0.5f,
+        Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "SystemUsesLightTheme", null) as int?);
+
+    // The rare states always, and any state whose profile file is missing.
+    static Icon SystemIconFor(TrayIcon icon) => icon switch
     {
         TrayIcon.Loading => SystemIcons.Application,
         TrayIcon.Downloading => SystemIcons.Shield,
@@ -337,11 +377,14 @@ sealed class TrayContext : ApplicationContext
     {
         // Hidden first, or the icon lingers in the tray until the mouse passes over it.
         hotkey?.Dispose();
+        // A static event: it would keep this context alive.
+        SystemEvents.UserPreferenceChanged -= OnPreferenceChanged;
         recordingLimit.Dispose();
         clipboard.Dispose();
         tray.Visible = false;
         tray.Dispose();
         menu.Dispose();
+        foreach (var icon in profiles.Values) icon?.Dispose();
         base.ExitThreadCore();
     }
 }

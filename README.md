@@ -65,7 +65,7 @@ On the first launch the app downloads the model (671 MB, from Hugging Face), wit
 ## Known limitations
 - The prebuilt app is tested on Intel Macs only; the Apple silicon build is not tested yet.
 - The app is signed ad-hoc, so each new version asks for Accessibility and the Microphone again (macOS ties permissions to the signature). The app clears its old Accessibility record itself.
-- The Windows app is not signed, so SmartScreen asks for "Run anyway" on the first launch of each new version. It has no Recent, smart spacing, sounds or Papo Reto icon yet.
+- The Windows app is not signed, so SmartScreen asks for "Run anyway" on the first launch of each new version. It has no Recent, smart spacing or sounds yet.
 - The model was trained with more European than Brazilian Portuguese: very short phrases may come out in Spanish, and it adds punctuation even to a single word.
 - The model stays in memory for instant transcription: on macOS, about 460 MB after loading. After a long dictation (from ~20 s) it reloads to give memory back (hourglass icon for a few seconds); on Windows, once it holds 1.3 GB.
 - Apps that do not expose their text to Accessibility (some Electron editors, the Google search box in Safari) get a space at the end of each dictation instead of smart spacing.

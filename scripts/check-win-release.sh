@@ -1,6 +1,6 @@
 #!/bin/bash
 # Fails unless a Windows release zip (PapoReto-<version>-win-x64.zip) holds only the PapoReto folder,
-# with an x64 PapoReto.exe built at <version>, the libs it transcribes with, the VAD and the third-party notices.
+# with an x64 PapoReto.exe built at <version>, the libs it transcribes with, the VAD, the third-party notices and the tray icons.
 set -euo pipefail
 
 zip="${1:?usage: $0 <PapoReto-version-win-x64.zip>}"
@@ -27,5 +27,12 @@ grep -qF "\"PapoReto/$version\"" "$app/PapoReto.deps.json" 2>/dev/null || fail "
 for file in sherpa-onnx.dll NAudio.Core.dll NAudio.Wasapi.dll silero_vad.onnx \
   THIRD_PARTY_NOTICES.md sherpa-onnx-LICENSE.txt onnxruntime-ThirdPartyNotices.txt dotnet-LICENSE.txt dotnet-THIRD-PARTY-NOTICES.txt; do
   [ -s "$app/$file" ] || fail "no $file next to PapoReto.exe"
+done
+# The tray's profile in both inks (W12); /usr/bin/file names the format.
+for state in ready listening thinking; do
+  for ink in white black; do
+    icon="tray-$state-$ink.ico"
+    [[ "$(/usr/bin/file -b "$app/$icon" 2>&1)" == "MS Windows icon resource"* ]] || fail "$icon is not a Windows icon next to PapoReto.exe"
+  done
 done
 exit $failed

@@ -15,4 +15,10 @@ public static class TrayIcons
         };
         return state is null ? null : $"tray-{state}-{(lightTaskbar ? "black" : "white")}.ico";
     }
+
+    /// <summary>A contrast theme repaints the taskbar in its background color without changing
+    /// SystemUsesLightTheme; otherwise that value is 1 for a light taskbar, and absent before Windows 10 1903,
+    /// whose taskbar is always dark.</summary>
+    public static bool LightTaskbar(bool highContrast, bool contrastBackgroundIsLight, int? systemUsesLightTheme) =>
+        highContrast ? contrastBackgroundIsLight : systemUsesLightTheme == 1;
 }

@@ -30,12 +30,18 @@ $(ORT_NOTICES): $(VAD_MODEL)
 	PAPO_ARCH=$(PAPO_ARCH) scripts/fetch-deps.sh libs
 	@touch $@
 
+# Atomic counters: parallel tests lost increments, and a line counted as entries minus exits read 0 (ADR-044).
+COVERAGE_FLAGS := -Xswiftc -Xllvm -Xswiftc -instrprof-atomic-counter-update-all
+
 .PHONY: test
 test: $(SHERPA_LIB)
 ifdef FILTER
 	swift test $(TESTING_FLAGS) --filter '$(FILTER)'
 else
-	swift test $(TESTING_FLAGS) --enable-code-coverage
+	@# The incremental build ignores a -Xllvm change, so objects built before COVERAGE_FLAGS would keep their counters.
+	@[ "$$(cat .build/coverage-flags 2>/dev/null)" = '$(COVERAGE_FLAGS)' ] || \
+		{ swift package clean && mkdir -p .build && echo '$(COVERAGE_FLAGS)' > .build/coverage-flags; }
+	swift test $(TESTING_FLAGS) --enable-code-coverage $(COVERAGE_FLAGS)
 	@BIN=$$(swift build --show-bin-path); \
 	xcrun llvm-cov report "$$BIN/PapoRetoPackageTests.xctest/Contents/MacOS/PapoRetoPackageTests" \
 		-instr-profile "$$BIN/codecov/default.profdata" Sources/PapoRetoCore \
